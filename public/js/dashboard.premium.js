@@ -32,6 +32,90 @@
   var paymentsPages = 0;
   var moduleLoadCache = Object.create(null);
 
+  function setExtraDiagnosis(card, state) {
+    var panel = card && card.querySelector('[data-role="diagnosis"]');
+    if (!panel) return;
+    panel.dataset.status = state;
+    var status = panel.querySelector('[data-role="diagnosis-status"]');
+    if (status) {
+      var key = "features_diagnosis_status_" + state;
+      status.textContent = t(key);
+    }
+    var issues = panel.querySelector('[data-role="diagnosis-issues"]');
+    if (issues) {
+      issues.innerHTML = "";
+      issues.classList.add("hidden");
+    }
+  }
+
+  async function diagnoseExtra(card) {
+    var module = card && card.getAttribute("data-premium-module");
+    var gid = guildId();
+    var button = card && card.querySelector('[data-role="diagnose"]');
+    if (!module || !gid || !button || button.disabled) return;
+
+    button.disabled = true;
+    setExtraDiagnosis(card, "checking");
+    try {
+      var result;
+      var state;
+      if (module === "trust") {
+        result = await NS.apiGet(
+          "/guilds/" + encodeURIComponent(gid) + "/trust-config",
+        );
+        state =
+          result && result.trust && result.trust.enabled ? "ready" : "disabled";
+      } else if (module === "giveaways") {
+        result = await NS.apiGet(
+          "/giveaways/config?guildId=" + encodeURIComponent(gid),
+        );
+        var giveaways = result && result.giveaways;
+        state =
+          !giveaways || !giveaways.enabled
+            ? "disabled"
+            : !giveaways.channelId ||
+                !giveaways.platforms ||
+                !giveaways.platforms.length
+              ? "incomplete"
+              : "ready";
+      } else if (module === "gamenews") {
+        result = await NS.apiGet(
+          "/gamenews/feeds?guildId=" + encodeURIComponent(gid),
+        );
+        var feeds = result && Array.isArray(result.items) ? result.items : [];
+        var enabledFeeds = feeds.filter(function (feed) {
+          return feed && feed.enabled !== false;
+        });
+        state = !enabledFeeds.length
+          ? "disabled"
+          : enabledFeeds.some(function (feed) {
+                return (!feed.feedUrl && !feed.feed) || !feed.channelId;
+              })
+            ? "incomplete"
+            : "ready";
+      } else if (module === "tempvoice") {
+        result = await NS.apiGet(
+          "/temp-voice/config?guildId=" + encodeURIComponent(gid),
+        );
+        var config = result && result.config;
+        state =
+          !config || !config.enabled
+            ? "disabled"
+            : !config.baseChannelIds || !config.baseChannelIds.length
+              ? "incomplete"
+              : "ready";
+      } else {
+        state = "error";
+      }
+      setExtraDiagnosis(card, state);
+    } catch (error) {
+      console.error("Premium module diagnosis error", error);
+      setExtraDiagnosis(card, "error");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function loadPremiumModule(module) {
     var gid = guildId();
     if (!gid || !module || typeof NS.loadPremiumModuleData !== "function")
@@ -644,6 +728,12 @@
     [byId("extrasGrid"), byId("featuresGrid")].forEach(function (grid) {
       if (!grid) return;
       grid.addEventListener("click", function (event) {
+        var diagnoseButton = event.target.closest('[data-role="diagnose"]');
+        if (diagnoseButton) {
+          var diagnosisCard = diagnoseButton.closest('[data-premium="true"]');
+          if (diagnosisCard) diagnoseExtra(diagnosisCard);
+          return;
+        }
         var detailsToggle = event.target.closest(".feature-card__toggle");
         if (detailsToggle) {
           var detailsCard = detailsToggle.closest('[data-premium="true"]');

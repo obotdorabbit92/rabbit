@@ -318,7 +318,7 @@ window.OzarkLocales.pt = {
   premium_until: "Válido até {date}",
   premium_update_error: "Não foi possível atualizar o premium.",
   extras_trust_hint:
-    "Visão geral do sistema de confiança usado para avaliar risco com base no comportamento e histórico.",
+    "Configura o intervalo do score, as penalizações e a recuperação.",
   extras_trust_info_body:
     'Cada utilizador tem um score (0-100) que representa o seu nível de risco. Infrações como WARN e MUTE reduzem o score imediatamente; sem novas infrações, o score recupera ao longo do tempo (regeneração). Quando o score fica abaixo do limiar "baixo", a automoderação torna-se mais restritiva; acima do limiar "alto", o utilizador é tratado como menor risco. Ajusta penalizações, regeneração e thresholds para definir a agressividade do sistema.',
   extras_trust_info_title: "Como funciona",
@@ -987,6 +987,10 @@ window.OzarkLocales.pt = {
   preset_welcome_plain: "Simples",
   preset_welcome_card: "Cartão",
   preset_welcome_vip: "VIP",
+  welcome_preset_message:
+    "Bem-vindo(a) {user} ao {server}! Já somos {memberCount} membros.",
+  welcome_preset_vip_message:
+    "Que bom ter-te por cá, {user}! Entraste no {server} e já somos {memberCount}. Lê as regras e diverte-te.",
   preset_goodbye_plain: "Simples",
   preset_goodbye_card: "Cartão",
   preset_stats_members: "Só membros",

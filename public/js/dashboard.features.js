@@ -332,8 +332,9 @@
           label: "preset_welcome_plain",
           values: {
             embed: false,
-            message:
-              "Bem-vindo(a) {user} ao {server}! Já somos {memberCount} membros.",
+            message: function () {
+              return t("welcome_preset_message");
+            },
             color: "#7c3aed",
           },
         },
@@ -342,8 +343,9 @@
           label: "preset_welcome_card",
           values: {
             embed: true,
-            message:
-              "Bem-vindo(a) {user} ao {server}! Já somos {memberCount} membros.",
+            message: function () {
+              return t("welcome_preset_message");
+            },
             color: "#7c3aed",
           },
         },
@@ -352,8 +354,9 @@
           label: "preset_welcome_vip",
           values: {
             embed: true,
-            message:
-              "Que bom ter-te por cá, {user}! Entraste no {server} e já somos {memberCount}. Lê as regras e diverte-te.",
+            message: function () {
+              return t("welcome_preset_vip_message");
+            },
             color: "#7c3aed",
           },
         },
@@ -1508,6 +1511,7 @@
       var el = card.querySelector('[data-field="' + name + '"]');
       if (!el) return;
       var val = preset.values[name];
+      if (typeof val === "function") val = val();
       if (el.type === "checkbox") {
         el.checked = val === true;
       } else {

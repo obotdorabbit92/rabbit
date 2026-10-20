@@ -1162,7 +1162,7 @@ h2 {
 
 #featuresGrid .feature-card[data-premium-module] .gamenews-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   gap: 12px;
   margin-top: 10px;
 }
@@ -1243,7 +1243,7 @@ h2 {
 
 /* Ajuste de alinhamento: painel da GameNews alinhado com o primeiro feed */
 #featuresGrid .feature-card[data-premium-module] .user-layout .user-detail {
-  margin-top: 28px;
+  margin-top: 0;
 }
 
 /* Skeleton loader — base partilhada pelos vários painéis */
@@ -1993,7 +1993,7 @@ h2 {
 
 #extras-trust-panel .trust-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: flex-start;
 }
@@ -2010,6 +2010,10 @@ h2 {
   border-radius: 8px;
   border: 1px solid var(--white-6);
   background: var(--veil-25);
+}
+
+#extras-trust-panel .trust-preview-block {
+  display: none;
 }
 
 #extras-trust-panel .trust-form-block h4,
@@ -2479,6 +2483,18 @@ body {
 
 .staff-role-feature-grid .select[multiple] {
   min-height: 112px;
+}
+
+#tab-config .staff-role-feature-grid .field {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--white-8);
+  border-radius: 8px;
+  background: var(--white-2);
+}
+
+#tab-config .staff-role-feature-grid .hint {
+  margin: 6px 0 0;
 }
 
 .tempvoice-actions-top {
@@ -3401,7 +3417,6 @@ summary:focus-visible,
 .giveaway-preview__image {
   margin-top: var(--sp-4);
   border-radius: var(--radius-md);
-  overflow: hidden;
   background: var(--veil-25);
 }
 
@@ -3409,8 +3424,8 @@ summary:focus-visible,
   width: 100%;
   height: auto;
   display: block;
-  max-height: 240px;
-  object-fit: cover;
+  max-height: 360px;
+  object-fit: contain;
 }
 
 .giveaway-preview__footer {
@@ -3495,12 +3510,6 @@ summary:focus-visible,
   margin-bottom: var(--sp-3);
 }
 
-@media (min-width: 1025px) {
-  #extras-giveaways-panel .preview-card {
-    position: sticky;
-    top: var(--sp-4);
-  }
-}
 @media (max-width: 1024px) {
   .ftk-grid {
     grid-template-columns: 1fr;
@@ -3548,7 +3557,7 @@ summary:focus-visible,
 .features-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
-  align-items: start;
+  align-items: stretch;
   gap: var(--sp-3);
   margin-top: var(--sp-4);
 }
@@ -3579,6 +3588,7 @@ summary:focus-visible,
 .feature-card {
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-width: 0;
   gap: var(--sp-2);
   padding: 12px;

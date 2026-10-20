@@ -1514,6 +1514,19 @@
                 data-premium-module="gamenews"
               >
                 <div class="feature-card__head">
+                  <label
+                    class="switch"
+                    data-i18n-title="features_enabled"
+                    title="Ativar GameNews"
+                  >
+                    <input
+                      type="checkbox"
+                      id="gamenewsEnabled"
+                      data-i18n-aria-label="features_enabled"
+                      aria-label="Ativar GameNews"
+                    />
+                    <span class="slider"></span>
+                  </label>
                   <h3 class="feature-card__name" data-i18n="gamenews_title">
                     GameNews
                   </h3>
@@ -1541,6 +1554,34 @@
                 <p class="hint" data-i18n="gamenews_hint">
                   Estado dos feeds de notícias e últimas publicações.
                 </p>
+                <div
+                  class="feature-diagnosis"
+                  data-role="diagnosis"
+                  data-status="unknown"
+                >
+                  <div class="feature-diagnosis__header">
+                    <span
+                      class="feature-diagnosis__status"
+                      data-role="diagnosis-status"
+                      role="status"
+                      aria-live="polite"
+                      data-i18n="features_diagnosis_status_unknown"
+                      >Por verificar</span
+                    >
+                    <button
+                      class="btn xs btn-ghost"
+                      type="button"
+                      data-role="diagnose"
+                      data-i18n="features_diagnose"
+                    >
+                      Diagnosticar
+                    </button>
+                  </div>
+                  <ul
+                    class="feature-diagnosis__issues hidden"
+                    data-role="diagnosis-issues"
+                  ></ul>
+                </div>
                 <div
                   class="feature-card__body hidden"
                   id="extras-feeds-panel"
@@ -1637,6 +1678,34 @@
                   Cria canais de voz temporários por utilizador, que são
                   apagados automaticamente quando ficam vazios.
                 </p>
+                <div
+                  class="feature-diagnosis"
+                  data-role="diagnosis"
+                  data-status="unknown"
+                >
+                  <div class="feature-diagnosis__header">
+                    <span
+                      class="feature-diagnosis__status"
+                      data-role="diagnosis-status"
+                      role="status"
+                      aria-live="polite"
+                      data-i18n="features_diagnosis_status_unknown"
+                      >Por verificar</span
+                    >
+                    <button
+                      class="btn xs btn-ghost"
+                      type="button"
+                      data-role="diagnose"
+                      data-i18n="features_diagnose"
+                    >
+                      Diagnosticar
+                    </button>
+                  </div>
+                  <ul
+                    class="feature-diagnosis__issues hidden"
+                    data-role="diagnosis-issues"
+                  ></ul>
+                </div>
                 <div
                   class="feature-card__body hidden"
                   id="extras-tempvoice-panel"
@@ -1833,6 +1902,20 @@
                 data-premium-module="trust"
               >
                 <div class="feature-card__head">
+                  <label
+                    class="switch"
+                    data-i18n-title="features_enabled"
+                    title="Ativar Trust"
+                  >
+                    <input
+                      type="checkbox"
+                      id="trustEnabled"
+                      data-role="trust-enabled"
+                      data-i18n-aria-label="features_enabled"
+                      aria-label="Ativar Trust"
+                    />
+                    <span class="slider"></span>
+                  </label>
                   <h3 class="feature-card__name" data-i18n="extras_trust_title">
                     Sistema de Trust
                   </h3>
@@ -1857,6 +1940,34 @@
                     ▾
                   </button>
                 </div>
+                <div
+                  class="feature-diagnosis"
+                  data-role="diagnosis"
+                  data-status="unknown"
+                >
+                  <div class="feature-diagnosis__header">
+                    <span
+                      class="feature-diagnosis__status"
+                      data-role="diagnosis-status"
+                      role="status"
+                      aria-live="polite"
+                      data-i18n="features_diagnosis_status_unknown"
+                      >Por verificar</span
+                    >
+                    <button
+                      class="btn xs btn-ghost"
+                      type="button"
+                      data-role="diagnose"
+                      data-i18n="features_diagnose"
+                    >
+                      Diagnosticar
+                    </button>
+                  </div>
+                  <ul
+                    class="feature-diagnosis__issues hidden"
+                    data-role="diagnosis-issues"
+                  ></ul>
+                </div>
                 <p class="hint" data-i18n="extras_trust_hint">
                   Visão geral do sistema de confiança usado para avaliar o risco
                   dos utilizadores com base no seu histórico.
@@ -1874,14 +1985,6 @@
                   <div class="feature-card__surface">
                     <div class="trust-layout">
                       <div class="trust-form-block">
-                        <h4 data-i18n="extras_trust_levels_title">
-                          Níveis de confiança
-                        </h4>
-                        <p data-i18n="extras_trust_levels_body">
-                          Os utilizadores recebem automaticamente níveis Alto,
-                          Médio ou Baixo com base nas infrações registadas.
-                        </p>
-
                         <div class="trust-form-row">
                           <label
                             for="trustPresetSelect"
@@ -2134,6 +2237,19 @@
                 data-premium-module="giveaways"
               >
                 <div class="feature-card__head">
+                  <label
+                    class="switch"
+                    data-i18n-title="giveaways_enabled"
+                    title="Ativar Free-To-Keep"
+                  >
+                    <input
+                      type="checkbox"
+                      id="giveawaysEnabled"
+                      data-i18n-aria-label="giveaways_enabled"
+                      aria-label="Ativar Free-To-Keep"
+                    />
+                    <span class="slider"></span>
+                  </label>
                   <h3 class="feature-card__name" data-i18n="giveaways_title">
                     Giveaways
                   </h3>
@@ -2158,6 +2274,34 @@
                     ▾
                   </button>
                 </div>
+                <div
+                  class="feature-diagnosis"
+                  data-role="diagnosis"
+                  data-status="unknown"
+                >
+                  <div class="feature-diagnosis__header">
+                    <span
+                      class="feature-diagnosis__status"
+                      data-role="diagnosis-status"
+                      role="status"
+                      aria-live="polite"
+                      data-i18n="features_diagnosis_status_unknown"
+                      >Por verificar</span
+                    >
+                    <button
+                      class="btn xs btn-ghost"
+                      type="button"
+                      data-role="diagnose"
+                      data-i18n="features_diagnose"
+                    >
+                      Diagnosticar
+                    </button>
+                  </div>
+                  <ul
+                    class="feature-diagnosis__issues hidden"
+                    data-role="diagnosis-issues"
+                  ></ul>
+                </div>
                 <p class="hint" data-i18n="giveaways_hint">
                   Publica automaticamente giveaways do GamerPower no canal
                   escolhido, assim que aparecem.
@@ -2173,13 +2317,6 @@
                     >Estado</span
                   >
                   <div class="feature-card__surface">
-                    <div
-                      class="ftk-summary"
-                      id="giveawaysSummary"
-                      aria-live="polite"
-                    ></div>
-                    <div class="ftk-headline" id="giveawaysHeadline"></div>
-
                     <div
                       class="status-card"
                       id="giveawaysStatusCard"
@@ -2252,18 +2389,6 @@
                     <div class="grid-2 ftk-grid">
                       <div>
                         <div class="ftk-config-card">
-                          <div class="field">
-                            <label class="switch">
-                              <input type="checkbox" id="giveawaysEnabled" />
-                              <span class="slider"></span>
-                            </label>
-                            <span
-                              class="switch-label"
-                              data-i18n="giveaways_enabled"
-                              >Ativar Free-To-Keep</span
-                            >
-                          </div>
-
                           <div id="giveawaysControls" class="ftk-controls">
                             <div class="field">
                               <label
@@ -2340,13 +2465,6 @@
                               >
                                 Seleciona pelo menos uma plataforma.
                               </div>
-                              <div
-                                class="hint"
-                                data-i18n="giveaways_only_games_hint"
-                              >
-                                Este modo filtra apenas jogos Free-To-Keep (não
-                                inclui loot/beta).
-                              </div>
                             </div>
 
                             <details
@@ -2372,12 +2490,6 @@
                                       max="3600"
                                       value="60"
                                     />
-                                    <div
-                                      class="hint"
-                                      data-i18n="giveaways_poll_hint"
-                                    >
-                                      Recomendado: 60–300s.
-                                    </div>
                                   </div>
                                   <div class="field">
                                     <label
@@ -2766,6 +2878,9 @@
                       multiple
                       size="4"
                     ></select>
+                    <p class="hint" data-i18n="config_staff_roles_feature_hint">
+                      Se vazio, usa a lista geral de cargos de staff.
+                    </p>
                   </div>
                   <div class="field">
                     <label
@@ -2779,6 +2894,9 @@
                       multiple
                       size="4"
                     ></select>
+                    <p class="hint" data-i18n="config_staff_roles_feature_hint">
+                      Se vazio, usa a lista geral de cargos de staff.
+                    </p>
                   </div>
                 </div>
               </div>

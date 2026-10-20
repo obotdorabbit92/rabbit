@@ -311,8 +311,7 @@ window.OzarkLocales.en = {
   premium_expired: "Premium expired",
   premium_until: "Valid until {date}",
   premium_update_error: "Could not update premium.",
-  extras_trust_hint:
-    "Trust system panel used to assess risk based on behavior.",
+  extras_trust_hint: "Configure the score range, penalties and recovery.",
   extras_trust_info_body:
     "Each user has a score from 0 to 100. WARN and MUTE apply immediate penalties; over time, without new infractions, the score regenerates gradually. Low scores indicate higher risk and trigger stricter automoderation; high scores indicate lower risk. Tune thresholds, penalties and regeneration to control how strict the system is.",
   extras_trust_info_title: "How it works",
@@ -967,6 +966,10 @@ window.OzarkLocales.en = {
   preset_welcome_plain: "Plain",
   preset_welcome_card: "Card",
   preset_welcome_vip: "VIP",
+  welcome_preset_message:
+    "Welcome {user} to {server}! We now have {memberCount} members.",
+  welcome_preset_vip_message:
+    "Great to have you here, {user}! Welcome to {server}, now with {memberCount} members. Please read the rules and enjoy your stay.",
   preset_goodbye_plain: "Plain",
   preset_goodbye_card: "Card",
   preset_stats_members: "Members only",

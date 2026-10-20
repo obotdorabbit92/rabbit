@@ -1842,6 +1842,9 @@
 
     return {
       trust: {
+        enabled:
+          !document.getElementById("trustEnabled") ||
+          document.getElementById("trustEnabled").checked,
         base: Number(core.base),
         min: Number(core.min),
         max: Number(core.max),
@@ -2167,6 +2170,9 @@
 
       // Trust config preview (read-only, global)
       const trust = conf && conf.trust ? conf.trust : null;
+      const trustEnabledInput = document.getElementById("trustEnabled");
+      if (trustEnabledInput)
+        trustEnabledInput.checked = !trust || trust.enabled !== false;
       const baseEl = document.getElementById("trustBaseValue");
       const minMaxEl = document.getElementById("trustMinMaxValue");
       const penaltiesEl = document.getElementById("trustPenaltiesValue");
@@ -3553,6 +3559,43 @@
     var btnApplyTrustPreset = document.getElementById("btnApplyTrustPreset");
     var btnSaveTrustConfig = document.getElementById("btnSaveTrustConfig");
     var trustSaveStatus = document.getElementById("trustSaveStatus");
+    var trustEnabledInput = document.getElementById("trustEnabled");
+
+    if (trustEnabledInput && !trustEnabledInput.dataset.bound) {
+      trustEnabledInput.dataset.bound = "1";
+      trustEnabledInput.addEventListener("change", function () {
+        var enabled = trustEnabledInput.checked;
+        if (!state.guildId) {
+          trustEnabledInput.checked = !enabled;
+          return;
+        }
+        trustEnabledInput.disabled = true;
+        apiPatch(
+          "/guilds/" + encodeURIComponent(state.guildId) + "/trust-config",
+          {
+            trustOverrides: Object.assign({}, state.currentTrustConfig || {}, {
+              enabled: enabled,
+            }),
+          },
+        )
+          .then(function (result) {
+            if (!result || result.ok === false)
+              throw new Error((result && result.error) || "SAVE_FAILED");
+            if (result.trust) state.currentTrustConfig = result.trust;
+            toast(t("trust_save_ok"), { type: "success" });
+          })
+          .catch(function (error) {
+            trustEnabledInput.checked = !enabled;
+            toast((error && error.apiMessage) || t("trust_save_error"), {
+              type: "error",
+            });
+          })
+          .finally(function () {
+            trustEnabledInput.disabled = false;
+            applyPermissionGates();
+          });
+      });
+    }
 
     function setTrustStatus(msg) {
       if (!trustSaveStatus) return;
