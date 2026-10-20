@@ -6,7 +6,6 @@ const {
   getCachedChannel,
   resolveChannel,
 } = require("../../services/guildService");
-const { isBotOperator } = require("../botRoles");
 
 module.exports = {
   registerTicketsRoutes,
@@ -51,12 +50,14 @@ function registerTicketsRoutes(opts) {
   function hasGuildAccess(req, guildId) {
     try {
       const u = req && req.dashboardUser;
-      if (!u || isBotOperator(u)) return true;
+      if (!u || !guildId) return false;
       const list = Array.isArray(u.allowedGuildIds)
         ? u.allowedGuildIds.filter(Boolean).map(String)
         : [];
-      if (!list.length) return true;
-      return list.includes(String(guildId));
+      return (
+        list.includes(String(guildId)) &&
+        String(u.selectedGuildId || "") === String(guildId)
+      );
     } catch {
       return false;
     }

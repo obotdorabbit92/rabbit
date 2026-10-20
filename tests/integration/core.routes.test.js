@@ -42,6 +42,8 @@ function buildCtx(overrides) {
       },
       getClient: () => null,
       Infraction: null,
+      requireGuildAccess: () => passthrough,
+      sanitizeId: (value) => String(value || ""),
     },
     overrides || {},
   );
@@ -57,6 +59,118 @@ test("GET /health reporta estado pronto", async () => {
     assert.equal(body.discordReady, true);
     assert.equal(body.mongoConnected, true);
     assert.equal(body.metrics.totalCommandsExecuted, 5);
+  } finally {
+    await stopApp(app.server);
+  }
+});
+
+test("server administrators cannot request the global overview", async () => {
+  const app = await startApp(
+    registerCoreRoutes,
+    buildCtx({
+      requireDashboardAuth(req, res, next) {
+        req.dashboardUser = {
+          role: "GUILD_ADMIN",
+          selectedGuildId: "111111111111111111",
+          allowedGuildIds: ["111111111111111111"],
+        };
+        next();
+      },
+      requireGuildAccess: () => (req, res, next) => next(),
+    }),
+  );
+  try {
+    const response = await fetch(app.baseUrl + "/api/overview");
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).error, "NO_GUILD_SELECTED");
+  } finally {
+    await stopApp(app.server);
+  }
+});
+
+test("bot owner receives a global overview only without selecting a server", async () => {
+  const app = await startApp(
+    registerCoreRoutes,
+    buildCtx({
+      requireDashboardAuth(req, res, next) {
+        req.dashboardUser = {
+          role: "BOT_OWNER",
+          selectedGuildId: null,
+          profile: "UNSCOPED",
+          guildScopeVersion: 2,
+        };
+        next();
+      },
+      getClient: () => ({ guilds: { cache: new Map() } }),
+    }),
+  );
+  try {
+    const response = await fetch(app.baseUrl + "/api/overview");
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).scope, "global");
+  } finally {
+    await stopApp(app.server);
+  }
+});
+
+test("server overview returns only the selected guild's counts and moderation actions", async () => {
+  const guildId = "111111111111111111";
+  let infractionQuery = null;
+  const app = await startApp(
+    registerCoreRoutes,
+    buildCtx({
+      requireDashboardAuth(req, res, next) {
+        req.dashboardUser = {
+          role: "GUILD_ADMIN",
+          selectedGuildId: guildId,
+          allowedGuildIds: [guildId],
+        };
+        next();
+      },
+      requireGuildAccess:
+        ({ from, key }) =>
+        (req, res, next) => {
+          const requestedGuildId = from === "query" ? req.query[key] : null;
+          if (
+            requestedGuildId !== guildId ||
+            req.dashboardUser.selectedGuildId !== requestedGuildId
+          ) {
+            return res
+              .status(403)
+              .json({ ok: false, error: "NO_GUILD_ACCESS" });
+          }
+          next();
+        },
+      getClient: () => ({
+        guilds: {
+          cache: new Map([
+            [guildId, { memberCount: 23 }],
+            ["222222222222222222", { memberCount: 91 }],
+          ]),
+        },
+      }),
+      Infraction: {
+        countDocuments(query) {
+          infractionQuery = query;
+          return { exec: async () => 4 };
+        },
+      },
+    }),
+  );
+  try {
+    const response = await fetch(
+      app.baseUrl + "/api/overview?guildId=" + guildId,
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      scope: "guild",
+      guilds: 1,
+      users: 23,
+      actions24h: 4,
+    });
+    assert.equal(infractionQuery.guildId, guildId);
+    assert.ok(infractionQuery.createdAt.$gte instanceof Date);
   } finally {
     await stopApp(app.server);
   }
@@ -84,6 +198,30 @@ test("global config is unavailable to guild administrators", async () => {
     });
     assert.equal(write.status, 403);
     assert.equal((await write.json()).error, "BOT_OWNER_REQUIRED");
+  } finally {
+    await stopApp(app.server);
+  }
+});
+
+test("a bot owner with a selected guild cannot read global config", async () => {
+  const app = await startApp(
+    registerCoreRoutes,
+    buildCtx({
+      requireDashboardAuth(req, res, next) {
+        req.dashboardUser = {
+          role: "BOT_OWNER",
+          selectedGuildId: "111111111111111111",
+          profile: "BOT_OWNER",
+          guildScopeVersion: 2,
+        };
+        next();
+      },
+    }),
+  );
+  try {
+    const response = await fetch(app.baseUrl + "/api/config");
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).error, "BOT_OWNER_REQUIRED");
   } finally {
     await stopApp(app.server);
   }

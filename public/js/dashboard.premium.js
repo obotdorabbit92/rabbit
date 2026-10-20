@@ -150,8 +150,7 @@
     var permissions = me && me.permissions;
     return !!(
       me &&
-      (me.role === "BOT_ADMIN" ||
-        me.role === "BOT_OWNER" ||
+      (me.role === "BOT_OWNER" ||
         (permissions && permissions.canEditConfig === true))
     );
   }

@@ -15,6 +15,22 @@ const { getGuildLang } = require("../../systems/i18n");
 const { PermissionsBitField } = require("discord.js");
 
 const FEATURE_NAMES = Object.keys(FEATURE_DEFAULTS);
+
+function hasLegacyFeatureConfig(name, value) {
+  if (!value || typeof value !== "object") return false;
+  if (value.enabled === true) return true;
+  const defaults = FEATURE_DEFAULTS[name] || {};
+  return Object.keys(defaults).some((field) => {
+    if (
+      field === "enabled" ||
+      value[field] === null ||
+      value[field] === undefined
+    )
+      return false;
+    return JSON.stringify(value[field]) !== JSON.stringify(defaults[field]);
+  });
+}
+
 const REQUIRED_FEATURE_FIELDS = {
   messageLogs: ["channelId"],
   reactionRoles: ["channelId", "messageId", "entries"],
@@ -547,6 +563,20 @@ function registerFeaturesRoutes({
           cfg = cfg.toObject();
         }
 
+        const configuredSet = new Set(
+          Array.isArray(cfg.featuresConfigured) ? cfg.featuresConfigured : [],
+        );
+        const configuredFeatures = Object.keys(FEATURE_DEFAULTS).reduce(
+          (configured, name) => {
+            const value = cfg.features && cfg.features[name];
+            configured[name] =
+              configuredSet.has(name) || hasLegacyFeatureConfig(name, value);
+            return configured;
+          },
+          {},
+        );
+        if (cfg.ticketThreadChannelId) configuredFeatures.tickets = true;
+
         const features = normalizeFeatures(cfg.features);
         if (
           cfg.ticketThreadChannelId &&
@@ -556,7 +586,7 @@ function registerFeaturesRoutes({
           features.tickets.channelId = cfg.ticketThreadChannelId;
           features.tickets.enabled = true;
         }
-        return res.json({ ok: true, features });
+        return res.json({ ok: true, features, configuredFeatures });
       } catch (err) {
         console.error("[Dashboard] /api/features GET error:", err);
         return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
@@ -683,7 +713,10 @@ function registerFeaturesRoutes({
           }
         }
 
-        const update = { $set: { [`features.${feature}`]: value } };
+        const update = {
+          $set: { [`features.${feature}`]: value },
+          $addToSet: { featuresConfigured: feature },
+        };
         if (feature === "tickets") {
           update.$set.ticketThreadChannelId = value.channelId || null;
         }

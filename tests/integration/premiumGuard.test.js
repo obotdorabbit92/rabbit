@@ -88,7 +88,7 @@ test("an expired guild license does not unlock premium features", async () => {
   assert.equal(result.body.error, "PREMIUM_REQUIRED");
 });
 
-test("bot admins still need an active server license to use Premium modules", async () => {
+test("legacy BOT_ADMIN sessions still need an active server license", async () => {
   const guard = makeGuard();
   const result = await runGuard(guard, "BOT_ADMIN");
   assert.equal(result.passed, false);

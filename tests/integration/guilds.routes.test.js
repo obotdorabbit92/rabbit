@@ -48,3 +48,49 @@ test("regular OAuth users without eligible guilds are still asked to re-authenti
     await stopApp(app.server);
   }
 });
+
+test("bot owner sees all installed guilds but only their own admin guild is manageable", async () => {
+  const app = await startApp(registerGuildsRoutes, {
+    requireDashboardAuth(req, res, next) {
+      req.dashboardUser = {
+        _id: "987654321098765432",
+        role: "BOT_OWNER",
+        oauth: true,
+        selectedGuildId: null,
+        allowedGuildIds: ["111111111111111111"],
+        allowedGuilds: [
+          {
+            id: "111111111111111111",
+            name: "Owned admin server",
+            owner: true,
+            permissions: "0",
+            botPresent: true,
+          },
+        ],
+        botGuildInventory: [
+          { id: "111111111111111111", name: "Owned admin server" },
+          { id: "222222222222222222", name: "Other server" },
+        ],
+      };
+      next();
+    },
+    requireGuildAccess: () => passthrough,
+    getClient: () => ({ guilds: { cache: new Map() } }),
+    sanitizeId,
+  });
+
+  try {
+    const response = await fetch(app.baseUrl + "/api/guilds");
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(
+      body.items.map((guild) => [guild.id, guild.manageable]),
+      [
+        ["111111111111111111", true],
+        ["222222222222222222", false],
+      ],
+    );
+  } finally {
+    await stopApp(app.server);
+  }
+});

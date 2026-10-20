@@ -4,7 +4,7 @@
 // Extraído de src/dashboard.js para reduzir o tamanho do entrypoint e permitir
 // testes unitários isolados (ver tests/unit/authMiddleware.test.js).
 
-const { PRIMARY_BOT_OWNER_ID } = require("./botRoles");
+const { getBotOwnerId, isGuildAdministrator } = require("./botRoles");
 
 /**
  * Cria o conjunto de middlewares de auth da dashboard.
@@ -17,6 +17,7 @@ const { PRIMARY_BOT_OWNER_ID } = require("./botRoles");
  */
 function createAuthMiddleware({ jwt, JWT_SECRET, sanitizeId, config }) {
   let authMisconfigLogged = false;
+  const botOwnerId = getBotOwnerId(process.env.BOT_OWNER_IDS);
 
   function isAuthEnabled() {
     const requireAuth = config.dashboard?.requireAuth;
@@ -92,12 +93,23 @@ function createAuthMiddleware({ jwt, JWT_SECRET, sanitizeId, config }) {
       if (payload.t !== "oauth" || !payload.sub) return null;
 
       const userId = String(payload.sub);
+      const selectedGuildId = payload.selectedGuildId
+        ? sanitizeId(payload.selectedGuildId)
+        : null;
+      const selectedGuild =
+        selectedGuildId && Array.isArray(payload.allowedGuilds)
+          ? payload.allowedGuilds.find(
+              (guild) => String(guild && guild.id) === selectedGuildId,
+            )
+          : null;
+      const isConfiguredOwner = userId === botOwnerId;
       return {
         _id: userId,
-        role:
-          userId === PRIMARY_BOT_OWNER_ID
-            ? "BOT_OWNER"
-            : payload.role || "USER",
+        role: isConfiguredOwner
+          ? "BOT_OWNER"
+          : selectedGuildId && isGuildAdministrator(selectedGuild)
+            ? "GUILD_ADMIN"
+            : "USER",
         username: payload.username || "discord",
         permissions:
           payload.permissions && typeof payload.permissions === "object"
@@ -128,9 +140,25 @@ function createAuthMiddleware({ jwt, JWT_SECRET, sanitizeId, config }) {
         allowedGuildIds: Array.isArray(payload.allowedGuildIds)
           ? payload.allowedGuildIds.map(String)
           : [],
-        selectedGuildId: payload.selectedGuildId
-          ? sanitizeId(payload.selectedGuildId)
-          : null,
+        botGuildInventory: Array.isArray(payload.botGuildInventory)
+          ? payload.botGuildInventory
+              .filter((guild) => guild && guild.id)
+              .map((guild) => ({
+                id: String(guild.id),
+                name: typeof guild.name === "string" ? guild.name : null,
+                icon: typeof guild.icon === "string" ? guild.icon : null,
+                memberCount:
+                  Number.isFinite(guild.memberCount) && guild.memberCount >= 0
+                    ? guild.memberCount
+                    : null,
+              }))
+          : [],
+        selectedGuildId,
+        guildScopeVersion:
+          Number.isInteger(payload.guildScopeVersion) &&
+          payload.guildScopeVersion > 0
+            ? payload.guildScopeVersion
+            : null,
         profile: payload.profile ? String(payload.profile) : null,
         oauth: true,
       };
@@ -166,8 +194,7 @@ function createAuthMiddleware({ jwt, JWT_SECRET, sanitizeId, config }) {
   // ------------------------------
   // Permission guard (RBAC)
   // ------------------------------
-  // Only bot administrators bypass granular checks. Guild admins use their
-  // explicit permissions and remain scoped to their eligible guilds.
+  // Only the bot owner bypasses granular checks. Guild admins remain scoped.
   function requirePerm({ anyOf = [] } = {}) {
     const needed = Array.isArray(anyOf) ? anyOf.filter(Boolean) : [];
     return (req, res, next) => {
@@ -190,7 +217,7 @@ function createAuthMiddleware({ jwt, JWT_SECRET, sanitizeId, config }) {
   // ------------------------------
   // Guild access guard (optional allow-list)
   // ------------------------------
-  // All OAuth profiles, including bot admins, stay within their signed guild allow-list.
+  // Every guild operation requires a selected guild in the signed allow-list.
   function requireGuildAccess({
     from = "params",
     key = "guildId",
@@ -215,16 +242,16 @@ function createAuthMiddleware({ jwt, JWT_SECRET, sanitizeId, config }) {
         raw = "";
       }
 
-      const gid = sanitizeId(raw);
       const selected = u && u.selectedGuildId ? String(u.selectedGuildId) : "";
 
       // If this route requires a guild id, force the user to select a guild first.
-      if (!selected && !optional) {
+      if (!selected) {
         return res.status(403).json({ ok: false, error: "NO_GUILD_SELECTED" });
       }
 
+      const requestedGuildId = sanitizeId(raw);
+      const gid = requestedGuildId || (optional ? selected : "");
       if (!gid) {
-        if (optional) return next();
         return res.status(400).json({ ok: false, error: "Missing guildId" });
       }
 
@@ -234,7 +261,14 @@ function createAuthMiddleware({ jwt, JWT_SECRET, sanitizeId, config }) {
       }
 
       // Enforce allow-list (OAuth callback already restricts to bot-present + owner/admin)
-      if (list.length && !list.includes(gid)) {
+      if (!list.includes(gid)) {
+        return res.status(403).json({ ok: false, error: "NO_GUILD_ACCESS" });
+      }
+
+      const metadata = Array.isArray(u.allowedGuilds)
+        ? u.allowedGuilds.find((guild) => String(guild.id) === gid)
+        : null;
+      if (!isGuildAdministrator(metadata)) {
         return res.status(403).json({ ok: false, error: "NO_GUILD_ACCESS" });
       }
 

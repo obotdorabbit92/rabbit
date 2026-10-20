@@ -154,7 +154,22 @@
   // For Discord OAuth sessions, mint a "server-scoped" session after the user selects a guild.
   // The token never touches the frontend: the backend stores it in an HttpOnly cookie.
   async function ensureGuildScopedToken(guildId) {
-    if (!guildId) return true;
+    if (!guildId) {
+      if (!state.me || state.me.role !== "BOT_OWNER") return false;
+      if (
+        !state.me.selectedGuildId &&
+        state.me.profile === "UNSCOPED" &&
+        state.me.guildScopeVersion === 2
+      )
+        return true;
+      try {
+        await apiPost("/auth/global", {});
+        await loadMe();
+        return true;
+      } catch {
+        return false;
+      }
+    }
 
     if (
       state.me &&
@@ -569,6 +584,10 @@
       return;
     }
     // Priority: no guild selected > bot offline > none
+    if (!state.guildId && state.me && state.me.role === "BOT_OWNER") {
+      clearGlobalBanner();
+      return;
+    }
     if (!state.guildId) {
       setGlobalBanner({
         key: "no-guild",
@@ -814,9 +833,7 @@
     elProfile.textContent =
       me.role === "BOT_OWNER"
         ? t("profile_bot_owner")
-        : me.role === "BOT_ADMIN"
-          ? t("profile_bot_admin")
-          : me.username || "Discord";
+        : me.username || "Discord";
     elProfile.classList.remove("badge-premium");
     elProfile.classList.toggle("badge-bot-owner", me.role === "BOT_OWNER");
     elProfile.classList.remove("hidden");
@@ -828,7 +845,6 @@
       (me.profile && me.profile !== "UNSCOPED")
     );
     var canManage = !!(
-      me.role === "BOT_ADMIN" ||
       me.role === "BOT_OWNER" ||
       perms.canEditConfig ||
       perms.canActOnCases ||
@@ -837,7 +853,20 @@
     );
 
     var accessLabel;
-    if (!scoped && me.oauth) {
+    if (!scoped && me.role === "BOT_OWNER") {
+      accessLabel = t("scope_global");
+      elAccess.classList.add("badge-manage");
+      elAccess.classList.remove("badge-readonly");
+    } else if (scoped) {
+      var selectedGuild = (state.guilds || []).find(function (guild) {
+        return guild && guild.id === state.guildId;
+      });
+      accessLabel = t("scope_server", {
+        server: selectedGuild ? selectedGuild.name : state.guildId,
+      });
+      elAccess.classList.add("badge-manage");
+      elAccess.classList.remove("badge-readonly");
+    } else if (me.oauth) {
       accessLabel = t("access_select_guild");
       elAccess.classList.remove("badge-readonly", "badge-manage");
     } else {
@@ -1060,6 +1089,36 @@
   }
 
   function setTab(name) {
+    if (
+      name === "premium-admin" &&
+      state.me &&
+      state.me.role === "BOT_OWNER" &&
+      state.guildId
+    ) {
+      var previousGuildId = state.guildId;
+      state.guildId = null;
+      ensureGuildScopedToken(null)
+        .then(function (ok) {
+          if (!ok) {
+            state.guildId = previousGuildId;
+            updateTabAccess();
+            return;
+          }
+          try {
+            localStorage.removeItem(GUILD_KEY);
+          } catch {}
+          var picker = document.getElementById("guildPicker");
+          if (picker) picker.value = "";
+          updateTabAccess();
+          setTab(name);
+        })
+        .catch(function () {
+          state.guildId = previousGuildId;
+          updateTabAccess();
+        });
+      return;
+    }
+
     const tabsRequiringGuild = [
       "logs",
       "features",
@@ -1261,11 +1320,18 @@
     const hasGuild = !!state.guildId;
     const ready = !!state.guildsLoaded;
     const globalPremiumView = state.currentTab === "premium-admin";
+    const globalOwnerView =
+      state.me && state.me.role === "BOT_OWNER" && !hasGuild;
     if (warn) {
       // Avoid flashing the warning during bootstrap (before guilds are loaded).
       warn.style.display =
-        !ready || hasGuild || globalPremiumView ? "none" : "block";
-      warn.classList.toggle("hidden", !ready || hasGuild || globalPremiumView);
+        !ready || hasGuild || globalPremiumView || globalOwnerView
+          ? "none"
+          : "block";
+      warn.classList.toggle(
+        "hidden",
+        !ready || hasGuild || globalPremiumView || globalOwnerView,
+      );
     }
 
     const p =
@@ -1393,7 +1459,10 @@
     if (!guildsEl || !usersEl || !actionsEl) return;
 
     try {
-      const data = await apiGet("/overview");
+      const overviewPath = state.guildId
+        ? "/overview?guildId=" + encodeURIComponent(state.guildId)
+        : "/overview";
+      const data = await apiGet(overviewPath);
       if (!data || data.ok === false) {
         throw new Error("Bad payload");
       }
@@ -1461,11 +1530,12 @@
       var returnParams = new URLSearchParams(window.location.search);
       var paymentReturnStatus = returnParams.get("premiumPayment");
       var paymentReturnGuildId = returnParams.get("guildId");
+      var isBotOwner = state.me && state.me.role === "BOT_OWNER";
       if (
         paymentReturnStatus &&
         paymentReturnGuildId &&
         items.some(function (g) {
-          return g && g.id === paymentReturnGuildId;
+          return g && g.id === paymentReturnGuildId && g.manageable;
         })
       ) {
         state.guildId = paymentReturnGuildId;
@@ -1474,34 +1544,53 @@
 
       const optEmpty = document.createElement("option");
       optEmpty.value = "";
-      optEmpty.textContent = t("select_guild");
+      optEmpty.textContent = t(isBotOwner ? "scope_global" : "select_guild");
       select.appendChild(optEmpty);
 
       items.forEach(function (g) {
         const opt = document.createElement("option");
         opt.value = g.id;
         opt.dataset.guildName = g.name;
-        opt.textContent = g.name;
+        opt.dataset.manageable = g.manageable ? "true" : "false";
+        opt.textContent = g.manageable
+          ? g.name
+          : g.name + " · " + t("guild_read_only");
+        opt.disabled = !g.manageable;
         select.appendChild(opt);
       });
 
       // Restore last selected guild if present and still allowed.
-      if (!state.guildId) {
+      if (!state.guildId && !isBotOwner) {
         var stored = getStoredGuildId();
         if (
           stored &&
           items.some(function (g) {
-            return g && g.id === stored;
+            return g && g.id === stored && g.manageable;
           })
         ) {
           state.guildId = stored;
+        } else if (stored) {
+          localStorage.removeItem(GUILD_KEY);
         }
       }
 
-      // Auto-select if there's only one guild available.
-      if (!state.guildId && items.length === 1 && items[0] && items[0].id) {
-        state.guildId = items[0].id;
+      // Bot owners always land in Global; server admins can auto-select one guild.
+      const manageableGuilds = items.filter(function (guild) {
+        return guild && guild.manageable;
+      });
+      if (
+        !isBotOwner &&
+        !state.guildId &&
+        manageableGuilds.length === 1 &&
+        manageableGuilds[0].id
+      ) {
+        state.guildId = manageableGuilds[0].id;
         setStoredGuildId(state.guildId);
+      }
+
+      if (isBotOwner && !state.guildId) {
+        localStorage.removeItem(GUILD_KEY);
+        await ensureGuildScopedToken(null);
       }
 
       // Mark loaded before we show/hide warnings.
@@ -1517,9 +1606,11 @@
             localStorage.removeItem(GUILD_KEY);
           } catch {}
           select.value = "";
-          try {
-            window.OzarkDashboard.showGuildSelect(items);
-          } catch {}
+          if (!isBotOwner) {
+            try {
+              window.OzarkDashboard.showGuildSelect(manageableGuilds);
+            } catch {}
+          }
           updateTabAccess();
           return;
         }
@@ -1547,10 +1638,12 @@
           );
         }
       } else {
-        // Force selection when multiple guilds are available.
-        try {
-          window.OzarkDashboard.showGuildSelect(items);
-        } catch {}
+        // Server admins with multiple eligible guilds must choose one. Bot owners stay Global.
+        if (!isBotOwner && manageableGuilds.length > 1) {
+          try {
+            window.OzarkDashboard.showGuildSelect(manageableGuilds);
+          } catch {}
+        }
         updateTabAccess();
         try {
           refreshGlobalBanner();
@@ -1599,9 +1692,7 @@
     // Trust controls live inside the Config tab (Extras -> Trust).
     const canEdit = !!(
       state.me &&
-      (state.me.role === "BOT_ADMIN" ||
-        state.me.role === "BOT_OWNER" ||
-        state.perms.canEditConfig)
+      (state.me.role === "BOT_OWNER" || state.perms.canEditConfig)
     );
     const trustInputs = [
       "trustPresetSelect",
@@ -2806,10 +2897,7 @@
     // Permission gate: allow save only if user can manage extras
     var perms = state.perms || {};
     var canEdit =
-      !!(
-        state.me &&
-        (state.me.role === "BOT_ADMIN" || state.me.role === "BOT_OWNER")
-      ) ||
+      !!(state.me && state.me.role === "BOT_OWNER") ||
       !!perms.canEditConfig ||
       !!perms.canManageGameNews;
 
@@ -3362,6 +3450,7 @@
     if (guildPicker) {
       guildPicker.addEventListener("change", function () {
         (async function () {
+          var previousGuildId = state.guildId;
           var v = guildPicker.value || "";
           state.guildId = v || null;
           try {
@@ -3381,12 +3470,9 @@
           // Mint scoped OAuth token (if needed) before enabling tabs.
           var okScoped = await ensureGuildScopedToken(state.guildId);
           if (!okScoped) {
-            state.guildId = null;
-            try {
-              guildPicker.value = "";
-            } catch {}
+            state.guildId = previousGuildId;
+            guildPicker.value = previousGuildId || "";
             updateTabAccess();
-            setTab("overview");
             return;
           }
 
@@ -3395,7 +3481,12 @@
 
           // Se nenhum servidor estiver selecionado, volta sempre para a visão geral.
           if (!state.guildId) {
+            try {
+              localStorage.removeItem(GUILD_KEY);
+            } catch {}
             setTab("overview");
+            updateAccessBadges();
+            loadOverview().catch(function () {});
             return;
           }
 
@@ -3764,10 +3855,8 @@
     function showGuildSelect(items) {
       if (!guildSelectScreen || !guildSelectList) return;
       if (guildSelectPremiumAdmin) {
-        var isBotOperator =
-          state.me &&
-          (state.me.role === "BOT_ADMIN" || state.me.role === "BOT_OWNER");
-        guildSelectPremiumAdmin.classList.toggle("hidden", !isBotOperator);
+        var isBotOwner = state.me && state.me.role === "BOT_OWNER";
+        guildSelectPremiumAdmin.classList.toggle("hidden", !isBotOwner);
       }
       if (!Array.isArray(items) || items.length < 2) {
         guildSelectScreen.classList.add("hidden");
@@ -3907,11 +3996,9 @@
         const roleKey =
           me.role === "BOT_OWNER"
             ? "profile_bot_owner"
-            : me.role === "BOT_ADMIN"
-              ? "profile_bot_admin"
-              : me.role === "GUILD_ADMIN"
-                ? "profile_guild_admin"
-                : "profile_viewer";
+            : me.role === "GUILD_ADMIN"
+              ? "profile_guild_admin"
+              : "profile_viewer";
         document.getElementById("accountProfileUsername").textContent =
           me.username || "Discord";
         document.getElementById("accountProfileId").textContent = me.id || "—";

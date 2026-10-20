@@ -6,7 +6,7 @@ const {
   resolveUser,
   formatUserTag,
 } = require("../../services/guildService");
-const { isBotOperator } = require("../botRoles");
+const { isBotOwner } = require("../botRoles");
 
 function registerTempVoiceRoutes({
   app,
@@ -115,7 +115,7 @@ function registerTempVoiceRoutes({
 
         const u = req.dashboardUser;
         const perms = (u && u.permissions) || {};
-        const isAdmin = isBotOperator(u);
+        const isAdmin = isBotOwner(u);
         if (!isAdmin && !perms.canEditConfig) {
           return res.status(403).json({ ok: false, error: "NO_PERMISSION" });
         }

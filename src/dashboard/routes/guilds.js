@@ -3,7 +3,7 @@
 const { sendServerError } = require("./_errors");
 const { ChannelType } = require("discord.js");
 const { getGuild, getCachedChannel } = require("../../services/guildService");
-const { isBotOperator } = require("../botRoles");
+const { isBotOwner, isGuildAdministrator } = require("../botRoles");
 
 /**
  * Guild-related routes used by the dashboard UI:
@@ -22,68 +22,59 @@ function registerGuildsRoutes({
   app.get("/api/guilds", requireDashboardAuth, async (req, res) => {
     try {
       const _client = getClient();
-      // We may not have a ready client cache yet; fall back to the allow-list from OAuth token.
-      // If neither exists, return empty list.
-
-      // Allow-list per authenticated dashboard user.
-      // Guild admins are revalidated against Discord permissions; bot admins
-      // use the signed allow-list assembled from servers with the bot installed.
       const u = req.dashboardUser;
-
-      // Backwards-compatibility: older sessions may contain an unfiltered allow-list.
-      // Prefer (and re-validate) OAuth metadata whenever available.
-      function hasAdministratorPermission(permissions) {
-        try {
-          // Discord "Administrator" bit = 0x8
-          const perm = BigInt(String(permissions || "0"));
-          return (perm & BigInt(0x8)) === BigInt(0x8);
-        } catch {
-          return false;
-        }
-      }
-
-      const metaAll =
-        u && Array.isArray(u.allowedGuilds)
-          ? u.allowedGuilds.filter((g) => g && g.id)
-          : [];
-
-      const strictEligibleFromMeta = isBotOperator(u)
-        ? Array.isArray(u.allowedGuildIds)
-          ? u.allowedGuildIds.map(String)
-          : []
-        : metaAll
-            .filter(
-              (g) =>
-                Boolean(g.owner) || hasAdministratorPermission(g.permissions),
-            )
-            .map((g) => String(g.id));
-
-      const allowList = strictEligibleFromMeta.length
-        ? strictEligibleFromMeta
-        : u && Array.isArray(u.allowedGuildIds)
-          ? u.allowedGuildIds.filter(Boolean).map(String)
-          : [];
-
-      // OAuth-only: if token has no allow-list, force re-auth (prevents stale/empty tokens from persisting).
-      if (u && u.oauth && allowList.length === 0 && !isBotOperator(u)) {
-        return res.json({ ok: true, items: [], reason: "NO_ELIGIBLE_GUILDS" });
-      }
-
-      // Prefer token metadata (from /users/@me/guilds) for stable listing even if client cache is not ready.
-      const allowedMeta = metaAll.filter((g) =>
-        allowList.includes(String(g.id)),
-      );
-
       const clientGuilds =
         _client && _client.guilds && _client.guilds.cache
           ? _client.guilds.cache
           : null;
+      const signedGuildIds = new Set(
+        Array.isArray(u && u.allowedGuildIds)
+          ? u.allowedGuildIds.map(String)
+          : [],
+      );
+      const manageableIds = new Set(
+        Array.isArray(u && u.allowedGuilds)
+          ? u.allowedGuilds
+              .filter(
+                (guild) =>
+                  guild &&
+                  signedGuildIds.has(String(guild.id)) &&
+                  isGuildAdministrator(guild) &&
+                  guild.botPresent !== false,
+              )
+              .map((guild) => String(guild.id))
+          : u && u.oauth
+            ? []
+            : Array.from(signedGuildIds),
+      );
 
-      const items = (
-        allowedMeta.length
-          ? allowedMeta
-          : allowList.map((id) => ({ id, name: null, icon: null }))
-      ).map((g) => {
+      if (u && u.oauth && manageableIds.size === 0 && !isBotOwner(u)) {
+        return res.json({ ok: true, items: [], reason: "NO_ELIGIBLE_GUILDS" });
+      }
+
+      const inventory = isBotOwner(u)
+        ? Array.isArray(u.botGuildInventory) && u.botGuildInventory.length
+          ? u.botGuildInventory
+          : clientGuilds
+            ? Array.from(clientGuilds.values()).map((guild) => ({
+                id: guild.id,
+                name: guild.name,
+                icon: guild.icon || null,
+                memberCount: guild.memberCount || null,
+              }))
+            : []
+        : Array.isArray(u && u.allowedGuilds)
+          ? u.allowedGuilds.filter(
+              (guild) =>
+                guild &&
+                guild.id &&
+                manageableIds.has(String(guild.id)) &&
+                isGuildAdministrator(guild) &&
+                guild.botPresent !== false,
+            )
+          : Array.from(manageableIds).map((id) => ({ id }));
+
+      const items = inventory.map((g) => {
         const cg = clientGuilds ? clientGuilds.get(String(g.id)) : null;
         return {
           id: String(g.id),
@@ -94,7 +85,8 @@ function registerGuildsRoutes({
                 ? g.name
                 : String(g.id),
           icon: typeof g.icon === "string" ? g.icon : null,
-          botPresent: !!cg,
+          botPresent: !!cg || (isBotOwner(u) && g.botPresent !== false),
+          manageable: manageableIds.has(String(g.id)),
           memberCount:
             cg && typeof cg.memberCount === "number"
               ? cg.memberCount
@@ -103,7 +95,10 @@ function registerGuildsRoutes({
                 : null,
         };
       });
-      items.sort((a, b) => a.name.localeCompare(b.name));
+      items.sort((a, b) => {
+        if (a.manageable !== b.manageable) return a.manageable ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
       return res.json({ ok: true, items });
     } catch (err) {
       return sendServerError(res, "/api/guilds", err);

@@ -59,6 +59,18 @@
         { type: "channel", name: "channelId", label: "features_channel" },
         { type: "bool", name: "ignoreBots", label: "features_ignore_bots" },
       ],
+      presets: [
+        {
+          id: "members",
+          label: "preset_logs_members",
+          values: { ignoreBots: true },
+        },
+        {
+          id: "all",
+          label: "preset_logs_all",
+          values: { ignoreBots: false },
+        },
+      ],
     },
     {
       key: "reactionRoles",
@@ -299,6 +311,13 @@
         },
         { type: "publish" },
       ],
+      presets: [
+        {
+          id: "standard",
+          label: "preset_tickets_standard",
+          values: { openEmoji: "🎫", closeEmoji: "🔒" },
+        },
+      ],
     },
     {
       key: "welcome",
@@ -394,7 +413,9 @@
           label: "preset_goodbye_plain",
           values: {
             embed: false,
-            message: "{user} saiu do servidor.",
+            message: function () {
+              return t("goodbye_preset_plain_message");
+            },
             color: "#ef4444",
           },
         },
@@ -403,8 +424,9 @@
           label: "preset_goodbye_card",
           values: {
             embed: true,
-            message:
-              "Até à próxima, {user}. O {server} ficou com {memberCount} membros.",
+            message: function () {
+              return t("goodbye_preset_card_message");
+            },
             color: "#ef4444",
           },
         },
@@ -454,7 +476,9 @@
             showMembers: true,
             showJoins: false,
             showLeaves: false,
-            memberTemplate: "👥 Membros: {count}",
+            memberTemplate: function () {
+              return t("stats_preset_members_template");
+            },
           },
         },
         {
@@ -464,9 +488,15 @@
             showMembers: true,
             showJoins: true,
             showLeaves: true,
-            memberTemplate: "👥 {count} membros",
-            joinsTemplate: "📥 +{count} (7d)",
-            leavesTemplate: "📤 -{count} (7d)",
+            memberTemplate: function () {
+              return t("stats_preset_emojis_members");
+            },
+            joinsTemplate: function () {
+              return t("stats_preset_emojis_joins");
+            },
+            leavesTemplate: function () {
+              return t("stats_preset_emojis_leaves");
+            },
           },
         },
         {
@@ -476,9 +506,15 @@
             showMembers: true,
             showJoins: true,
             showLeaves: true,
-            memberTemplate: "Membros: {count}",
-            joinsTemplate: "Entradas 7d: {count}",
-            leavesTemplate: "Saídas 7d: {count}",
+            memberTemplate: function () {
+              return t("stats_preset_plain_members");
+            },
+            joinsTemplate: function () {
+              return t("stats_preset_plain_joins");
+            },
+            leavesTemplate: function () {
+              return t("stats_preset_plain_leaves");
+            },
           },
         },
       ],
@@ -494,6 +530,23 @@
           min: 15,
           max: 1440,
           step: 15,
+        },
+      ],
+      presets: [
+        {
+          id: "hourly",
+          label: "preset_memes_hourly",
+          values: { intervalMinutes: 60 },
+        },
+        {
+          id: "daily",
+          label: "preset_memes_daily",
+          values: { intervalMinutes: 720 },
+        },
+        {
+          id: "frequent",
+          label: "preset_memes_frequent",
+          values: { intervalMinutes: 30 },
         },
       ],
     },
@@ -514,6 +567,21 @@
   ];
 
   var current = {}; // Valores carregados da API (por funcionalidade).
+  var configuredFeatures = {};
+  var requiredSetupFields = {
+    messageLogs: ["channelId"],
+    reactionRoles: ["channelId", "messageId", "entries"],
+    autoKick: ["infractionsToKick"],
+    levels: ["xpMin", "xpMax", "cooldownSeconds"],
+    starboard: ["channelId", "threshold"],
+    verification: ["roleId", "channelId"],
+    tickets: ["channelId", "openEmoji", "closeEmoji"],
+    welcome: ["channelId", "message"],
+    goodbye: ["channelId", "message"],
+    serverStats: ["serverStats"],
+    memes: ["channelId", "intervalMinutes"],
+    twitch: ["streamerName", "channelId"],
+  };
   var channels = null; // Cache de canais do guild.
   var roles = null; // Cache de cargos do guild.
   var metaGuildId = null;
@@ -1001,7 +1069,8 @@
   }
 
   function cardHtml(feature) {
-    var v = current[feature.key] || {};
+    var isConfigured = configuredFeatures[feature.key] === true;
+    var v = isConfigured ? current[feature.key] || {} : { enabled: false };
     var enabled = v.enabled === true;
     var premiumModule = feature.premiumModule
       ? String(feature.premiumModule)
@@ -1049,24 +1118,27 @@
               return (
                 '<button type="button" class="chip preset-chip" data-role="preset" data-preset="' +
                 esc(p.id) +
-                '">' +
+                '" aria-pressed="false">' +
                 esc(t(p.label)) +
                 "</button>"
               );
             })
             .join("") +
+          '<button type="button" class="chip preset-chip" data-role="preset" data-preset="custom" aria-pressed="false">' +
+          esc(t("features_preset_custom")) +
+          "</button>" +
           "</div>"
         : "";
 
-    // Só faz sentido avisar "ativa para configurar" quando a funcionalidade tem campos.
-    var hasFields = !!(feature.fields && feature.fields.length);
-    var offHintHtml = hasFields
-      ? '<p class="hint' +
-        (enabled ? " hidden" : "") +
-        '" data-role="off-hint">' +
-        esc(t("features_disabled_hint")) +
-        "</p>"
-      : "";
+    var configStateHtml =
+      '<span class="feature-card__config-state" data-role="config-state">' +
+      esc(t(isConfigured ? "features_configured" : "features_not_configured")) +
+      "</span>";
+    var setupHintHtml = isConfigured
+      ? ""
+      : '<p class="hint" data-role="setup-hint">' +
+        esc(t("features_setup_hint")) +
+        "</p>";
 
     // Pré-visualização (boas-vindas/saída): espelha o embed enviado ao Discord.
     var previewHtml = feature.preview
@@ -1118,6 +1190,7 @@
       '<p class="hint">' +
       esc(t(descKey)) +
       "</p>" +
+      configStateHtml +
       '<div class="feature-diagnosis" data-role="diagnosis" data-status="unknown">' +
       '<div class="feature-diagnosis__header">' +
       '<span class="feature-diagnosis__status" data-role="diagnosis-status" role="status" aria-live="polite">' +
@@ -1132,10 +1205,10 @@
       '<div class="feature-card__body hidden" id="feature-body-' +
       esc(feature.key) +
       '">' +
+      setupHintHtml +
       presetsHtml +
       (fields ? '<div class="feature-card__fields">' + fields + "</div>" : "") +
       previewHtml +
-      offHintHtml +
       '<div class="feature-card__actions">' +
       '<div class="feature-card__actions-left">' +
       '<button class="btn xs" type="button" data-role="save">' +
@@ -1277,8 +1350,50 @@
       : false;
   }
 
+  function updateConfigState(card) {
+    if (!card) return;
+    var key = card.getAttribute("data-feature");
+    var state = card.querySelector('[data-role="config-state"]');
+    var setupHint = card.querySelector('[data-role="setup-hint"]');
+    var isConfigured = configuredFeatures[key] === true;
+    var isDirty = card.getAttribute("data-dirty") === "true";
+    if (state) {
+      state.textContent = t(
+        isDirty
+          ? "features_unsaved"
+          : isConfigured
+            ? "features_configured"
+            : "features_not_configured",
+      );
+    }
+    if (setupHint)
+      setupHint.classList.toggle("hidden", isConfigured || isDirty);
+  }
+
+  function markCardDraft(card, preservePreset) {
+    if (!card) return;
+    card.setAttribute("data-dirty", "true");
+    var feature = FEATURES.filter(function (item) {
+      return item.key === card.getAttribute("data-feature");
+    })[0];
+    if (feature && feature.presets && !preservePreset) {
+      card.setAttribute("data-selected-preset", "custom");
+      Array.prototype.forEach.call(
+        card.querySelectorAll('[data-role="preset"]'),
+        function (button) {
+          button.setAttribute(
+            "aria-pressed",
+            button.getAttribute("data-preset") === "custom" ? "true" : "false",
+          );
+        },
+      );
+    }
+    updateConfigState(card);
+  }
+
   function applyDisabled(card) {
     if (!card) return;
+    var key = card.getAttribute("data-feature");
     var enabledEl = card.querySelector('[data-role="enabled"]');
     var on = !!(enabledEl && enabledEl.checked);
     var premiumLocked =
@@ -1286,18 +1401,22 @@
     var saving = card.getAttribute("data-saving") === "true";
     card.classList.toggle("is-off", !on);
     card.classList.toggle("is-premium-locked", premiumLocked);
-    var offHint = card.querySelector('[data-role="off-hint"]');
-    if (offHint) offHint.classList.toggle("hidden", on);
     Array.prototype.slice
       .call(
         card.querySelectorAll(
-          '[data-field], [data-entry], [data-role="save"], [data-role="test"], [data-role="add-entry"], [data-role="entry-remove"], [data-role="publish"]',
+          '[data-field], [data-entry], [data-role="save"], [data-role="test"], [data-role="add-entry"], [data-role="entry-remove"], [data-role="publish"], [data-role="preset"]',
         ),
       )
       .forEach(function (el) {
-        el.disabled = !on || premiumLocked || saving;
+        el.disabled = premiumLocked || saving;
       });
-    if (enabledEl) enabledEl.disabled = premiumLocked || saving;
+    var testBtn = card.querySelector('[data-role="test"]');
+    var publishBtn = card.querySelector('[data-role="publish"]');
+    if (testBtn) testBtn.disabled = !on || premiumLocked || saving;
+    if (publishBtn) publishBtn.disabled = !on || premiumLocked || saving;
+    if (enabledEl)
+      enabledEl.disabled =
+        premiumLocked || saving || configuredFeatures[key] !== true;
   }
 
   function wireCard(card) {
@@ -1326,6 +1445,11 @@
 
     if (enabledEl) {
       enabledEl.addEventListener("change", function () {
+        if (card.getAttribute("data-dirty") === "true") {
+          enabledEl.checked = !!(current[key] && current[key].enabled);
+          notify(t("features_save_before_toggle"), { type: "info" });
+          return;
+        }
         resetDiagnosis(card);
         applyDisabled(card);
         saveFeature(key);
@@ -1385,10 +1509,12 @@
       : null;
     if (fieldsWrap) {
       fieldsWrap.addEventListener("input", function () {
+        markCardDraft(card);
         resetDiagnosis(card);
         if (refreshPreview) refreshPreview();
       });
       fieldsWrap.addEventListener("change", function () {
+        markCardDraft(card);
         resetDiagnosis(card);
         if (refreshPreview) refreshPreview();
       });
@@ -1484,51 +1610,52 @@
     return out;
   }
 
-  // Aplica um preset: escreve os valores recomendados nos campos, liga a
-  // funcionalidade (se estiver desligada) e guarda. A configuração continua
-  // editável à mão depois disto.
-  async function applyPreset(key, presetId, btn) {
+  // Presets only populate the draft. Saving and enabling remain explicit.
+  function applyPreset(key, presetId, button) {
     var feature = FEATURES.filter(function (f) {
       return f.key === key;
     })[0];
     var card = cardFor(key);
     if (!feature || !card || !feature.presets) return;
 
-    var preset = feature.presets.filter(function (p) {
-      return p.id === presetId;
-    })[0];
+    var preset =
+      presetId === "custom"
+        ? { id: "custom", values: {} }
+        : feature.presets.filter(function (p) {
+            return p.id === presetId;
+          })[0];
     if (!preset) return;
 
-    if (btn) btn.disabled = true;
-
-    var enabledEl = card.querySelector('[data-role="enabled"]');
-    if (enabledEl && !enabledEl.checked) {
-      enabledEl.checked = true;
-      applyDisabled(card);
+    if (presetId !== "custom") {
+      Object.keys(preset.values || {}).forEach(function (name) {
+        var el = card.querySelector('[data-field="' + name + '"]');
+        if (!el) return;
+        var val = preset.values[name];
+        if (typeof val === "function") val = val();
+        if (el.type === "checkbox") {
+          el.checked = val === true;
+        } else {
+          el.value = val == null ? "" : String(val);
+        }
+      });
     }
-
-    Object.keys(preset.values || {}).forEach(function (name) {
-      var el = card.querySelector('[data-field="' + name + '"]');
-      if (!el) return;
-      var val = preset.values[name];
-      if (typeof val === "function") val = val();
-      if (el.type === "checkbox") {
-        el.checked = val === true;
-      } else {
-        el.value = val == null ? "" : String(val);
-      }
-    });
 
     var previewBox = card.querySelector('[data-role="preview"]');
     if (previewBox) renderEmbedPreview(card, feature, previewBox);
-
-    var ok = await saveFeature(key, true);
-    notify(ok ? t("features_preset_applied") : t("features_save_error"), {
-      type: ok ? "success" : "error",
-    });
-
-    if (btn) btn.disabled = false;
-    applyDisabled(card);
+    card.setAttribute("data-selected-preset", presetId);
+    Array.prototype.forEach.call(
+      card.querySelectorAll('[data-role="preset"]'),
+      function (presetButton) {
+        presetButton.setAttribute(
+          "aria-pressed",
+          presetButton === button ? "true" : "false",
+        );
+      },
+    );
+    setCardExpanded(card, true);
+    markCardDraft(card, true);
+    resetDiagnosis(card);
+    notify(t("features_preset_applied"), { type: "info" });
   }
 
   function updateMessageIdLabel(key) {
@@ -1550,6 +1677,23 @@
     var card = cardFor(key);
     if (card && card.getAttribute("data-saving") === "true") return false;
     var value = collect(key);
+    var feature = FEATURES.filter(function (item) {
+      return item.key === key;
+    })[0];
+    if (configuredFeatures[key] !== true) {
+      var hasPresets = feature && feature.presets && feature.presets.length;
+      var selectedPreset = card && card.getAttribute("data-selected-preset");
+      var missing = (requiredSetupFields[key] || []).some(function (name) {
+        if (name === "entries") return !value.entries || !value.entries.length;
+        if (name === "serverStats")
+          return !value.showMembers && !value.showJoins && !value.showLeaves;
+        return value[name] == null || value[name] === "";
+      });
+      if ((hasPresets && !selectedPreset) || missing) {
+        notify(t("features_setup_incomplete"), { type: "warn" });
+        return false;
+      }
+    }
     var saveBtn = card ? card.querySelector('[data-role="save"]') : null;
     var statusEl = card ? card.querySelector('[data-role="status"]') : null;
 
@@ -1569,6 +1713,9 @@
       if (!res || res.ok === false)
         throw new Error((res && res.error) || "ERROR");
       current[key] = res && res.value ? res.value : value;
+      configuredFeatures[key] = true;
+      card.setAttribute("data-dirty", "false");
+      updateConfigState(card);
       resetDiagnosis(card);
       if (!silent) {
         if (statusEl) statusEl.textContent = "";
@@ -1712,6 +1859,8 @@
 
     var gid = guildId();
     if (!gid) {
+      current = {};
+      configuredFeatures = {};
       grid.innerHTML = "";
       appendStaticPremiumCards(grid);
       return;
@@ -1725,6 +1874,12 @@
         "/features?guildId=" + encodeURIComponent(gid),
       );
       current = data && data.features ? data.features : {};
+      configuredFeatures =
+        data && data.configuredFeatures ? data.configuredFeatures : {};
+      FEATURES.forEach(function (feature) {
+        if (configuredFeatures[feature.key] !== true)
+          current[feature.key] = { enabled: false };
+      });
       render();
     } catch (err) {
       console.error("Features load error", err);

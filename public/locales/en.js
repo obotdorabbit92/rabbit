@@ -13,7 +13,6 @@ window.OzarkLocales.en = {
   access_select_guild: "Select server",
   access_readonly: "Read-only",
   access_manage: "Manage",
-  profile_bot_admin: "Admin",
   profile_bot_owner: "Admin",
   profile_title: "Your account",
   profile_discord_account: "Discord account",
@@ -74,6 +73,9 @@ window.OzarkLocales.en = {
   config_dashboard_access_viewers_hint:
     "Read-only (logs and view configuration).",
   guild_select_error_access: "You don't have dashboard access to this server.",
+  scope_global: "Global",
+  scope_server: "Server: {server}",
+  guild_read_only: "view only",
   guild_select_error_generic: "Couldn't select the server.",
   config_dashboard_log_channel: "Dashboard log channel",
   config_error_generic: "An error occurred.",
@@ -949,7 +951,17 @@ window.OzarkLocales.en = {
 
   // Per-feature configuration presets
   features_presets: "Presets",
-  features_preset_applied: "Preset applied and saved.",
+  features_preset_applied: "Preset added to the form. Review and save it.",
+  features_configured: "Configured",
+  features_not_configured: "Not configured",
+  features_unsaved: "Unsaved changes",
+  features_setup_hint:
+    "Choose a preset or fill in the fields, then save. You can enable it afterward.",
+  features_save_before_toggle:
+    "Save your changes before changing the feature state.",
+  features_preset_custom: "Custom",
+  features_setup_incomplete:
+    "Complete the required fields and choose a preset or Custom before saving.",
   preset_autokick_soft: "Soft (5)",
   preset_autokick_strict: "Strict (3)",
   preset_autokick_severe: "Severe (1)",
@@ -966,10 +978,26 @@ window.OzarkLocales.en = {
   preset_welcome_plain: "Plain",
   preset_welcome_card: "Card",
   preset_welcome_vip: "VIP",
+  preset_logs_members: "Members only",
+  preset_logs_all: "All messages",
+  preset_tickets_standard: "Standard panel",
+  preset_memes_hourly: "Every hour",
+  preset_memes_daily: "Twice a day",
+  preset_memes_frequent: "Every 30 minutes",
   welcome_preset_message:
     "Welcome {user} to {server}! We now have {memberCount} members.",
   welcome_preset_vip_message:
     "Great to have you here, {user}! Welcome to {server}, now with {memberCount} members. Please read the rules and enjoy your stay.",
+  goodbye_preset_plain_message: "{user} left the server.",
+  goodbye_preset_card_message:
+    "See you next time, {user}. {server} now has {memberCount} members.",
+  stats_preset_members_template: "👥 Members: {count}",
+  stats_preset_emojis_members: "👥 {count} members",
+  stats_preset_emojis_joins: "📥 +{count} (7d)",
+  stats_preset_emojis_leaves: "📤 -{count} (7d)",
+  stats_preset_plain_members: "Members: {count}",
+  stats_preset_plain_joins: "Joins 7d: {count}",
+  stats_preset_plain_leaves: "Leaves 7d: {count}",
   preset_goodbye_plain: "Plain",
   preset_goodbye_card: "Card",
   preset_stats_members: "Members only",

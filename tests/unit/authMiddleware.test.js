@@ -119,27 +119,87 @@ test("decodeDashboardToken assume USER quando o token não define perfil", async
   eq(user.role, "USER");
 });
 
-test("decodeDashboardToken promove a owner principal mesmo com um token antigo", async () => {
-  const { decodeDashboardToken } = makeMw({
-    payload: { t: "oauth", sub: "810243963574550558", role: "USER" },
-  });
-  const user = await decodeDashboardToken("token");
-  eq(user.role, "BOT_OWNER");
+test("decodeDashboardToken promotes the configured owner from a versioned token", async () => {
+  const previousBotOwnerIds = process.env.BOT_OWNER_IDS;
+  process.env.BOT_OWNER_IDS = "234567890123456789";
+  try {
+    const { decodeDashboardToken } = makeMw({
+      payload: {
+        t: "oauth",
+        sub: "234567890123456789",
+        role: "USER",
+        guildScopeVersion: 2,
+      },
+    });
+    const user = await decodeDashboardToken("token");
+    eq(user.role, "BOT_OWNER");
+  } finally {
+    if (previousBotOwnerIds === undefined) delete process.env.BOT_OWNER_IDS;
+    else process.env.BOT_OWNER_IDS = previousBotOwnerIds;
+  }
 });
 
-test("decodeDashboardToken preserves bot operator role in an unscoped session", async () => {
-  const { decodeDashboardToken } = makeMw({
-    payload: {
-      t: "oauth",
-      sub: "1",
-      role: "BOT_OWNER",
-      profile: "UNSCOPED",
-      selectedGuildId: null,
-    },
-  });
-  const user = await decodeDashboardToken("token");
-  eq(user.role, "BOT_OWNER");
-  eq(user.selectedGuildId, null);
+test("decodeDashboardToken does not promote the built-in owner when overridden", async () => {
+  const previousBotOwnerIds = process.env.BOT_OWNER_IDS;
+  process.env.BOT_OWNER_IDS = "234567890123456789";
+  try {
+    const { decodeDashboardToken } = makeMw({
+      payload: {
+        t: "oauth",
+        sub: "810243963574550558",
+        role: "USER",
+      },
+    });
+    const user = await decodeDashboardToken("token");
+    eq(user.role, "USER");
+  } finally {
+    if (previousBotOwnerIds === undefined) delete process.env.BOT_OWNER_IDS;
+    else process.env.BOT_OWNER_IDS = previousBotOwnerIds;
+  }
+});
+
+test("decodeDashboardToken recognizes a legacy configured owner for session migration", async () => {
+  const previousBotOwnerIds = process.env.BOT_OWNER_IDS;
+  process.env.BOT_OWNER_IDS = "234567890123456789";
+  try {
+    const { decodeDashboardToken } = makeMw({
+      payload: {
+        t: "oauth",
+        sub: "234567890123456789",
+        role: "USER",
+        profile: "UNSCOPED",
+      },
+    });
+    const user = await decodeDashboardToken("token");
+    eq(user.role, "BOT_OWNER");
+    eq(user.guildScopeVersion, null);
+  } finally {
+    if (previousBotOwnerIds === undefined) delete process.env.BOT_OWNER_IDS;
+    else process.env.BOT_OWNER_IDS = previousBotOwnerIds;
+  }
+});
+
+test("decodeDashboardToken accepts the configured owner in a versioned global session", async () => {
+  const previousBotOwnerIds = process.env.BOT_OWNER_IDS;
+  process.env.BOT_OWNER_IDS = "234567890123456789";
+  try {
+    const { decodeDashboardToken } = makeMw({
+      payload: {
+        t: "oauth",
+        sub: "234567890123456789",
+        role: "BOT_OWNER",
+        profile: "UNSCOPED",
+        selectedGuildId: null,
+        guildScopeVersion: 2,
+      },
+    });
+    const user = await decodeDashboardToken("token");
+    eq(user.role, "BOT_OWNER");
+    eq(user.selectedGuildId, null);
+  } finally {
+    if (previousBotOwnerIds === undefined) delete process.env.BOT_OWNER_IDS;
+    else process.env.BOT_OWNER_IDS = previousBotOwnerIds;
+  }
 });
 
 test("requirePerm devolve 403 quando falta a permissão", () => {
@@ -205,7 +265,12 @@ test("requireDashboardAuth não pode ser desativado em produção", () => {
 test("requireGuildAccess deixa passar a guild selecionada", () => {
   const { requireGuildAccess } = makeMw();
   const req = {
-    dashboardUser: { selectedGuildId: "111", allowedGuildIds: [] },
+    dashboardUser: {
+      selectedGuildId: "111",
+      allowedGuildIds: ["111"],
+      allowedGuilds: [{ id: "111", owner: true, permissions: "0" }],
+      role: "GUILD_ADMIN",
+    },
     params: { guildId: "111" },
   };
   const res = makeRes();
@@ -233,7 +298,11 @@ test("requireGuildAccess exige seleção de guild quando não é opcional", () =
 test("requireGuildAccess bloqueia guild diferente da selecionada", () => {
   const { requireGuildAccess } = makeMw();
   const req = {
-    dashboardUser: { selectedGuildId: "111", allowedGuildIds: [] },
+    dashboardUser: {
+      selectedGuildId: "111",
+      allowedGuildIds: ["111"],
+      role: "GUILD_ADMIN",
+    },
     params: { guildId: "222" },
   };
   const res = makeRes();
@@ -247,26 +316,87 @@ test("requireGuildAccess bloqueia guild diferente da selecionada", () => {
 test("requireGuildAccess aplica a allow-list", () => {
   const { requireGuildAccess } = makeMw();
   const req = {
-    dashboardUser: { selectedGuildId: null, allowedGuildIds: ["111"] },
+    dashboardUser: {
+      selectedGuildId: "222",
+      allowedGuildIds: ["111"],
+      role: "GUILD_ADMIN",
+    },
     params: { guildId: "222" },
   };
   const res = makeRes();
-  requireGuildAccess({ optional: true })(req, res, () => {
+  requireGuildAccess()(req, res, () => {
     throw new Error("não devia passar");
   });
   eq(res.statusCode, 403);
   eq(res.body.error, "NO_GUILD_ACCESS");
 });
 
-test("requireGuildAccess opcional passa quando não há guildId", () => {
+test("requireGuildAccess opcional uses the selected guild when guildId is omitted", () => {
   const { requireGuildAccess } = makeMw();
   const req = {
-    dashboardUser: { selectedGuildId: "111", allowedGuildIds: [] },
+    dashboardUser: {
+      role: "GUILD_ADMIN",
+      selectedGuildId: "111",
+      allowedGuildIds: ["111"],
+      allowedGuilds: [{ id: "111", owner: true, permissions: "0" }],
+    },
     query: { guildId: "" },
   };
   const res = makeRes();
   let passed = false;
   requireGuildAccess({ from: "query", optional: true })(req, res, () => {
+    passed = true;
+  });
+  ok(passed);
+});
+
+test("requireGuildAccess optional still requires a selected server scope", () => {
+  const { requireGuildAccess } = makeMw();
+  const req = {
+    dashboardUser: { selectedGuildId: null, allowedGuildIds: [] },
+    query: { guildId: "" },
+  };
+  const res = makeRes();
+  requireGuildAccess({ from: "query", optional: true })(req, res, () => {
+    throw new Error("não devia passar");
+  });
+  eq(res.statusCode, 403);
+  eq(res.body.error, "NO_GUILD_SELECTED");
+});
+
+test("requireGuildAccess rejects a bot owner from guilds they do not administer", () => {
+  const { requireGuildAccess } = makeMw();
+  const req = {
+    dashboardUser: {
+      role: "BOT_OWNER",
+      selectedGuildId: "111",
+      allowedGuildIds: ["111"],
+      allowedGuilds: [{ id: "111", owner: false, permissions: "0" }],
+    },
+    params: { guildId: "111" },
+  };
+  const res = makeRes();
+  requireGuildAccess()(req, res, () => {
+    throw new Error("não devia passar");
+  });
+  eq(res.statusCode, 403);
+  eq(res.body.error, "NO_GUILD_ACCESS");
+});
+
+test("requireGuildAccess permits bot owner in a guild they also administer", () => {
+  const { requireGuildAccess } = makeMw();
+  const req = {
+    dashboardUser: {
+      role: "BOT_OWNER",
+      selectedGuildId: "111",
+      allowedGuildIds: ["111"],
+      allowedGuilds: [{ id: "111", owner: false, permissions: "8" }],
+    },
+    params: { guildId: "111" },
+  };
+  const res = makeRes();
+  let passed = false;
+  requireGuildAccess()(req, res, () => {
     passed = true;
   });
   ok(passed);

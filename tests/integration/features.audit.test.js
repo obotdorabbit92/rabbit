@@ -47,6 +47,39 @@ test("feature updates are recorded without including custom message content", as
   }
 });
 
+test("feature loading distinguishes saved features from normalized defaults", async () => {
+  const guildId = "123456789012345678";
+  const app = await startApp(registerFeaturesRoutes, {
+    requireDashboardAuth: passthrough,
+    requirePerm: () => passthrough,
+    requireGuildAccess: () => passthrough,
+    sanitizeId,
+    GuildConfig: {
+      findOne() {
+        return {
+          lean: async () => ({
+            guildId,
+            features: { welcome: { enabled: false, channelId: "11111" } },
+          }),
+        };
+      },
+    },
+  });
+
+  try {
+    const response = await fetch(
+      app.baseUrl + "/api/features?guildId=" + guildId,
+    );
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.configuredFeatures.welcome, true);
+    assert.equal(result.configuredFeatures.messageLogs, false);
+    assert.equal(result.features.welcome.enabled, false);
+  } finally {
+    await stopApp(app.server);
+  }
+});
+
 test("memes and Twitch feature updates are normalized before persistence", async () => {
   const updates = [];
   const app = await startApp(registerFeaturesRoutes, {
@@ -83,6 +116,7 @@ test("memes and Twitch feature updates are normalized before persistence", async
       channelId: "123456789012345678",
       intervalMinutes: 15,
     });
+    assert.equal(updates[0].update.$addToSet.featuresConfigured, "memes");
 
     const twitchResponse = await updateFeature("twitch", {
       enabled: true,
@@ -97,6 +131,7 @@ test("memes and Twitch feature updates are normalized before persistence", async
       channelId: "123456789012345678",
       roleId: "987654321098765432",
     });
+    assert.equal(updates[1].update.$addToSet.featuresConfigured, "twitch");
     assert.equal(updates.length, 2);
   } finally {
     await stopApp(app.server);

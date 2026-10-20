@@ -2,11 +2,11 @@
 //
 // Discord OAuth2-only authentication.
 // Login is allowed for any user with access to at least one guild.
-// Guild administrators can manage only their own eligible servers. Bot admins
-// owners and delegated admins are identified by separate Discord user ID lists.
+// The configured bot owner has global access; guild administrators remain
+// limited to servers where Discord OAuth confirms their authority.
 
 const { getGuild } = require("../../services/guildService");
-const { getBotOwnerIds, parseBotUserIds, getBotRole } = require("../botRoles");
+const { getBotOwnerId, isGuildAdministrator } = require("../botRoles");
 
 function registerAuthRoutes(ctx) {
   const {
@@ -23,14 +23,8 @@ function registerAuthRoutes(ctx) {
   } = ctx;
 
   const crypto = require("crypto");
-  const botOwnerIds = getBotOwnerIds(process.env.BOT_OWNER_IDS);
-  const botAdminIds = parseBotUserIds(
-    process.env.BOT_ADMIN_IDS,
-    "BOT_ADMIN_IDS",
-  );
-  const getBotRoleForUser = (userId) =>
-    getBotRole(userId, botOwnerIds, botAdminIds);
-  const isBotOwnerUser = (userId) => getBotRoleForUser(userId) === "BOT_OWNER";
+  const botOwnerId = getBotOwnerId(process.env.BOT_OWNER_IDS);
+  const isBotOwnerUser = (userId) => String(userId || "") === botOwnerId;
 
   // OAuth robustness: avoid duplicate token exchanges, and gracefully handle Discord global rate limits.
   // Note: in-memory only. If you run multiple replicas, consider a shared store (e.g. Redis) to dedupe across instances.
@@ -71,20 +65,6 @@ function registerAuthRoutes(ctx) {
   }
   function inflightKey(req, state) {
     return `${getClientIp(req)}:${String(state || "").slice(0, 64)}`;
-  }
-
-  const ADMINISTRATOR = 8n;
-  function hasAdministratorPermission(g) {
-    try {
-      // Discord returns permissions as a string integer (can exceed 2^53).
-      const p =
-        typeof g.permissions === "string"
-          ? BigInt(g.permissions)
-          : BigInt(Number(g.permissions || 0));
-      return (p & ADMINISTRATOR) === ADMINISTRATOR;
-    } catch {
-      return false;
-    }
   }
 
   function oauthEnabled() {
@@ -442,53 +422,50 @@ function registerAuthRoutes(ctx) {
           client && client.guilds && client.guilds.cache
             ? Array.from(client.guilds.cache.keys()).map(String)
             : null;
-
-        const allowedGuilds =
+        const botGuildInventory =
           isBotOwnerUser(me.id) &&
           client &&
           client.guilds &&
           client.guilds.cache
             ? Array.from(client.guilds.cache.values())
-                .map((g) => ({
-                  id: String(g.id),
-                  name: typeof g.name === "string" ? g.name : null,
-                  icon: typeof g.icon === "string" ? g.icon : null,
-                  owner: false,
-                  permissions: "0",
-                  botPresent: true,
+                .map((guild) => ({
+                  id: String(guild.id),
+                  name: typeof guild.name === "string" ? guild.name : null,
+                  icon: typeof guild.icon === "string" ? guild.icon : null,
+                  memberCount:
+                    typeof guild.memberCount === "number"
+                      ? guild.memberCount
+                      : null,
                 }))
                 .slice(0, 200)
-            : guilds
-                .filter((g) => g && g.id)
-                .filter(
-                  (g) => g.owner === true || hasAdministratorPermission(g),
-                )
-                .map((g) => {
-                  const botPresent = Array.isArray(botGuildIds)
-                    ? botGuildIds.includes(String(g.id))
-                    : null;
-                  return {
-                    id: String(g.id),
-                    name: typeof g.name === "string" ? g.name : null,
-                    icon: typeof g.icon === "string" ? g.icon : null,
-                    owner: g.owner === true,
-                    permissions:
-                      typeof g.permissions === "string"
-                        ? g.permissions
-                        : String(g.permissions || ""),
-                    botPresent,
-                  };
-                })
-                .filter((g) =>
-                  g.botPresent === null ? true : g.botPresent === true,
-                )
-                .slice(0, 200);
+            : [];
+
+        const allowedGuilds = guilds
+          .filter((g) => g && g.id && isGuildAdministrator(g))
+          .map((g) => {
+            const botPresent = Array.isArray(botGuildIds)
+              ? botGuildIds.includes(String(g.id))
+              : null;
+            return {
+              id: String(g.id),
+              name: typeof g.name === "string" ? g.name : null,
+              icon: typeof g.icon === "string" ? g.icon : null,
+              owner: g.owner === true,
+              permissions:
+                typeof g.permissions === "string"
+                  ? g.permissions
+                  : String(g.permissions || ""),
+              botPresent,
+            };
+          })
+          .filter((g) => (g.botPresent === null ? true : g.botPresent))
+          .slice(0, 200);
 
         const allowedGuildIds = allowedGuilds.map((g) => g.id);
-        const botRole = getBotRoleForUser(me.id);
+        const botOwner = isBotOwnerUser(me.id);
 
-        // Bot operators can use global Premium administration without guild access.
-        if (allowedGuildIds.length === 0 && !isBotOwnerUser(me.id)) {
+        // The bot owner can use global administration without guild access.
+        if (allowedGuildIds.length === 0 && !botOwner) {
           clearCookie(res, "dash_token");
           const redirectUrl = `/?oauthError=NO_GUILDS`;
           oauthCodeCache.set(code, {
@@ -505,7 +482,7 @@ function registerAuthRoutes(ctx) {
         });
 
         // Guild-scoped operations remain protected by the guild access middleware.
-        const perms = isBotOwnerUser(me.id)
+        const perms = botOwner
           ? Object.assign({}, ADMIN_PERMISSIONS || {}, { canManageUsers: true })
           : {};
 
@@ -514,11 +491,13 @@ function registerAuthRoutes(ctx) {
             t: "oauth",
             sub: String(me.id),
             username: safeUsername,
-            role: botRole || "USER",
+            role: botOwner ? "BOT_OWNER" : "USER",
             permissions: perms,
             allowedGuildIds,
             allowedGuilds,
+            botGuildInventory,
             selectedGuildId: null,
+            guildScopeVersion: 2,
             profile: "UNSCOPED",
           },
           JWT_SECRET,
@@ -529,7 +508,7 @@ function registerAuthRoutes(ctx) {
         // Note: fetch calls are same-origin, so cookies are automatically sent.
 
         // If the user only has one guild, auto-select it by minting a scoped token.
-        if (allowedGuildIds.length === 1) {
+        if (allowedGuildIds.length === 1 && !botOwner) {
           const scoped = await mintScopedToken({
             userId: String(me.id),
             username: safeUsername,
@@ -577,6 +556,7 @@ function registerAuthRoutes(ctx) {
     username,
     allowedGuildIds,
     allowedGuilds,
+    botGuildInventory,
     guildId,
   }) {
     const gid = sanitizeId(guildId);
@@ -591,20 +571,15 @@ function registerAuthRoutes(ctx) {
     const guild = getGuild(client, gid);
     if (!guild) return null;
 
-    const botRole = getBotRoleForUser(userId);
-    const botOwner = botRole === "BOT_OWNER";
+    const botOwner = isBotOwnerUser(userId);
 
-    // Guild administrators receive server-scoped permissions; bot admins are
-    // granted the separate global dashboard role.
+    // Guild-scoped tokens are available only when the user administers the guild.
     const meta = Array.isArray(allowedGuilds)
       ? allowedGuilds.find((g) => g && String(g.id) === String(gid))
       : null;
-    const isOwner = meta && meta.owner === true;
-    const isAdmin = meta ? hasAdministratorPermission(meta) : false;
+    if (!isGuildAdministrator(meta)) return null;
 
-    if (!botOwner && !(isOwner || isAdmin)) return null;
-
-    const profile = botRole || "GUILD_ADMIN";
+    const profile = botOwner ? "BOT_OWNER" : "GUILD_ADMIN";
     const role = profile;
 
     const perms = Object.assign({}, ADMIN_PERMISSIONS || {}, {
@@ -623,6 +598,10 @@ function registerAuthRoutes(ctx) {
         permissions: perms,
         allowedGuildIds: allowed.slice(0, 200),
         selectedGuildId: gid,
+        botGuildInventory: Array.isArray(botGuildInventory)
+          ? botGuildInventory
+          : [],
+        guildScopeVersion: 2,
         profile,
       },
       JWT_SECRET,
@@ -682,6 +661,9 @@ function registerAuthRoutes(ctx) {
           username: u.username || "discord",
           allowedGuildIds: allowed,
           allowedGuilds: Array.isArray(u.allowedGuilds) ? u.allowedGuilds : [],
+          botGuildInventory: Array.isArray(u.botGuildInventory)
+            ? u.botGuildInventory
+            : [],
           guildId: gid,
         });
 
@@ -704,6 +686,55 @@ function registerAuthRoutes(ctx) {
     },
   );
 
+  app.post(
+    "/api/auth/global",
+    requireDashboardAuth,
+    express.json(),
+    rlSelect,
+    async (req, res) => {
+      const user = req.dashboardUser;
+      if (!user || !isBotOwnerUser(user._id)) {
+        return res.status(403).json({ ok: false, error: "BOT_OWNER_REQUIRED" });
+      }
+
+      const token = jwt.sign(
+        {
+          t: "oauth",
+          sub: String(user._id),
+          username: sanitizeText(user.username || "discord", {
+            maxLen: 32,
+            stripHtml: true,
+          }),
+          role: "BOT_OWNER",
+          permissions: Object.assign({}, ADMIN_PERMISSIONS || {}, {
+            canManageUsers: true,
+          }),
+          allowedGuildIds: Array.isArray(user.allowedGuildIds)
+            ? user.allowedGuildIds
+            : [],
+          allowedGuilds: Array.isArray(user.allowedGuilds)
+            ? user.allowedGuilds
+            : [],
+          botGuildInventory: Array.isArray(user.botGuildInventory)
+            ? user.botGuildInventory
+            : [],
+          selectedGuildId: null,
+          guildScopeVersion: 2,
+          profile: "UNSCOPED",
+        },
+        JWT_SECRET,
+        { expiresIn: "4h" },
+      );
+      setCookie(res, "dash_token", token, {
+        httpOnly: true,
+        sameSite: "Lax",
+        secure: isSecureRequest(req),
+        maxAge: 4 * 60 * 60,
+      });
+      return res.json({ ok: true });
+    },
+  );
+
   app.get("/api/auth/me", requireDashboardAuth, async (req, res) => {
     const u = req.dashboardUser;
     if (!u) return res.status(401).json({ ok: false, error: "NO_USER" });
@@ -716,6 +747,9 @@ function registerAuthRoutes(ctx) {
         permissions: u.permissions || {},
         allowedGuildIds: Array.isArray(u.allowedGuildIds)
           ? u.allowedGuildIds
+          : [],
+        botGuildInventory: Array.isArray(u.botGuildInventory)
+          ? u.botGuildInventory
           : [],
         selectedGuildId: u.selectedGuildId || null,
         profile: u.profile || null,

@@ -224,7 +224,17 @@ function makeHarness(options) {
     getSettings: () => premiumSettings,
     getGuildConfig: () => guildConfig,
     setUser(user) {
-      currentUser = user;
+      currentUser =
+        user && user.role === "BOT_OWNER" && user.selectedGuildId === undefined
+          ? Object.assign(
+              {
+                profile: "UNSCOPED",
+                selectedGuildId: null,
+                guildScopeVersion: 2,
+              },
+              user,
+            )
+          : user;
     },
   };
 }
@@ -273,7 +283,7 @@ test("Premium checkout creates a pending PayPal order and verified capture activ
   }
 });
 
-test("Premium status reads for bot operators never create temporary server licenses", async () => {
+test("Premium status reads never create temporary server licenses", async () => {
   const harness = makeHarness();
   const app = await harness.appPromise;
   harness.setUser({ _id: USER_ID, username: "bot-owner", role: "BOT_OWNER" });
@@ -326,6 +336,19 @@ test("Premium payment history is visible only to the bot owner", async () => {
     const stillDenied = await fetch(app.baseUrl + "/api/premium/payments");
     assert.equal(stillDenied.status, 403);
 
+    harness.setUser({
+      _id: USER_ID,
+      username: "bot-owner",
+      role: "BOT_OWNER",
+      selectedGuildId: GUILD_ID,
+      profile: "BOT_OWNER",
+      guildScopeVersion: 2,
+    });
+    const scopedOwnerDenied = await fetch(
+      app.baseUrl + "/api/premium/payments",
+    );
+    assert.equal(scopedOwnerDenied.status, 403);
+
     harness.setUser({ _id: USER_ID, username: "bot-owner", role: "BOT_OWNER" });
     const allowed = await fetch(app.baseUrl + "/api/premium/payments");
     assert.equal(allowed.status, 200);
@@ -335,7 +358,7 @@ test("Premium payment history is visible only to the bot owner", async () => {
   }
 });
 
-test("bot operators can page and filter the full Premium payment history", async () => {
+test("bot owner can page and filter the full Premium payment history", async () => {
   const harness = makeHarness();
   const app = await harness.appPromise;
   const now = new Date();

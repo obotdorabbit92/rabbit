@@ -8,7 +8,7 @@ const { normalizePremium, PREMIUM_MODULES } = require("../../systems/premium");
 const { invalidateGuildConfig } = require("../../systems/guildConfigService");
 const { createPayPalService } = require("../paypalService");
 const { formatUserTag } = require("../../services/guildService");
-const { isBotOperator, isBotOwner } = require("../botRoles");
+const { isGlobalBotOwner } = require("../botRoles");
 
 const PREMIUM_FIXED_AMOUNT = "10.00";
 const PREMIUM_FIXED_CURRENCY = "EUR";
@@ -211,15 +211,8 @@ function registerPremiumRoutes({
         })
       : (req, res, next) => next();
 
-  function requireBotAdmin(req, res, next) {
-    if (!isBotOperator(req.dashboardUser)) {
-      return res.status(403).json({ ok: false, error: "NO_PERMISSION" });
-    }
-    return next();
-  }
-
   function requireBotOwner(req, res, next) {
-    if (!isBotOwner(req.dashboardUser)) {
+    if (!isGlobalBotOwner(req.dashboardUser)) {
       return res.status(403).json({ ok: false, error: "BOT_OWNER_REQUIRED" });
     }
     return next();
@@ -406,7 +399,7 @@ function registerPremiumRoutes({
   app.get(
     "/api/premium/admin/guilds",
     requireDashboardAuth,
-    requireBotAdmin,
+    requireBotOwner,
     async (req, res) => {
       try {
         if (!GuildConfig)
@@ -516,7 +509,7 @@ function registerPremiumRoutes({
   app.patch(
     "/api/premium/admin/guilds/:guildId",
     requireDashboardAuth,
-    requireBotAdmin,
+    requireBotOwner,
     async (req, res) => {
       try {
         if (!GuildConfig)
@@ -853,7 +846,7 @@ function registerPremiumRoutes({
   app.get(
     "/api/premium/payments",
     requireDashboardAuth,
-    requireBotAdmin,
+    requireBotOwner,
     async (req, res) => {
       try {
         if (!PremiumPayment)

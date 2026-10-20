@@ -3665,6 +3665,16 @@ summary:focus-visible,
   font-weight: var(--fw-semibold);
   color: var(--text);
 }
+.feature-card__config-state {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.feature-card[data-dirty="true"] .feature-card__config-state {
+  color: var(--warning);
+}
+.feature-card [data-role="setup-hint"] {
+  margin: 0;
+}
 .feature-card__toggle {
   flex: 0 0 auto;
 }
@@ -3792,6 +3802,11 @@ summary:focus-visible,
 }
 .preset-chip:hover {
   border-color: var(--accent);
+  color: var(--accent);
+}
+.preset-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-16);
   color: var(--accent);
 }
 .preset-chip:disabled {

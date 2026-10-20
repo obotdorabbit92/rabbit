@@ -13,7 +13,6 @@ window.OzarkLocales.pt = {
   access_select_guild: "Selecionar servidor",
   access_readonly: "Leitura",
   access_manage: "Gestão",
-  profile_bot_admin: "Admin",
   profile_bot_owner: "Admin",
   profile_title: "A tua conta",
   profile_discord_account: "Conta Discord",
@@ -76,6 +75,9 @@ window.OzarkLocales.pt = {
   config_dashboard_access_viewers_hint:
     "Apenas leitura (logs e ver configuração).",
   guild_select_error_access: "Não tens acesso a este servidor na dashboard.",
+  scope_global: "Global",
+  scope_server: "Servidor: {server}",
+  guild_read_only: "só consulta",
   guild_select_error_generic: "Não foi possível selecionar o servidor.",
   config_dashboard_log_channel: "Canal de logs da dashboard",
   config_error_generic: "Ocorreu um erro.",
@@ -970,7 +972,17 @@ window.OzarkLocales.pt = {
 
   // Presets de configuração por funcionalidade
   features_presets: "Presets",
-  features_preset_applied: "Preset aplicado e guardado.",
+  features_preset_applied: "Preset preenchido. Revê e guarda a configuração.",
+  features_configured: "Configurada",
+  features_not_configured: "Não configurada",
+  features_unsaved: "Alterações por guardar",
+  features_setup_hint:
+    "Escolhe um preset ou preenche os campos e guarda. Depois podes ativar.",
+  features_save_before_toggle:
+    "Guarda as alterações antes de alterar o estado da funcionalidade.",
+  features_preset_custom: "Personalizado",
+  features_setup_incomplete:
+    "Preenche os campos obrigatórios e escolhe um preset ou Personalizado antes de guardar.",
   preset_autokick_soft: "Suave (5)",
   preset_autokick_strict: "Rigoroso (3)",
   preset_autokick_severe: "Severo (1)",
@@ -987,10 +999,26 @@ window.OzarkLocales.pt = {
   preset_welcome_plain: "Simples",
   preset_welcome_card: "Cartão",
   preset_welcome_vip: "VIP",
+  preset_logs_members: "Apenas membros",
+  preset_logs_all: "Todas as mensagens",
+  preset_tickets_standard: "Painel padrão",
+  preset_memes_hourly: "De hora a hora",
+  preset_memes_daily: "Duas vezes por dia",
+  preset_memes_frequent: "A cada 30 minutos",
   welcome_preset_message:
     "Bem-vindo(a) {user} ao {server}! Já somos {memberCount} membros.",
   welcome_preset_vip_message:
     "Que bom ter-te por cá, {user}! Entraste no {server} e já somos {memberCount}. Lê as regras e diverte-te.",
+  goodbye_preset_plain_message: "{user} saiu do servidor.",
+  goodbye_preset_card_message:
+    "Até à próxima, {user}. O {server} ficou com {memberCount} membros.",
+  stats_preset_members_template: "👥 Membros: {count}",
+  stats_preset_emojis_members: "👥 {count} membros",
+  stats_preset_emojis_joins: "📥 +{count} (7d)",
+  stats_preset_emojis_leaves: "📤 -{count} (7d)",
+  stats_preset_plain_members: "Membros: {count}",
+  stats_preset_plain_joins: "Entradas 7d: {count}",
+  stats_preset_plain_leaves: "Saídas 7d: {count}",
   preset_goodbye_plain: "Simples",
   preset_goodbye_card: "Cartão",
   preset_stats_members: "Só membros",

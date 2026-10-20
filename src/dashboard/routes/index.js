@@ -105,6 +105,7 @@ function registerDashboardRoutes(ctx) {
   registerCoreRoutes({
     app,
     requireDashboardAuth,
+    requireGuildAccess,
     requirePerm,
     rateLimit,
     recordAudit,
@@ -114,6 +115,7 @@ function registerDashboardRoutes(ctx) {
     metrics,
     getClient,
     Infraction,
+    sanitizeId,
   });
 
   registerAuthRoutes({

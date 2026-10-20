@@ -2,11 +2,12 @@
 
 const { sendServerError } = require("./_errors");
 const crypto = require("crypto");
-const { isBotOperator, isBotOwner } = require("../botRoles");
+const { isGlobalBotOwner } = require("../botRoles");
 
 function registerCoreRoutes({
   app,
   requireDashboardAuth,
+  requireGuildAccess,
   rateLimit,
   recordAudit,
   getActorFromRequest,
@@ -15,6 +16,7 @@ function registerCoreRoutes({
   metrics,
   getClient,
   Infraction,
+  sanitizeId,
 }) {
   // Permite acesso automático (monitorização) via header x-metrics-token.
   // Aceita também `Authorization: Bearer <METRICS_TOKEN>`, que é o formato que o
@@ -45,58 +47,87 @@ function registerCoreRoutes({
     }
   }
 
-  // Overview metrics for dashboard
-  app.get("/api/overview", requireDashboardAuth, async (req, res) => {
-    try {
-      const client = typeof getClient === "function" ? getClient() : null;
-      if (!client || !client.guilds || !client.guilds.cache) {
+  const guardGuildQuery =
+    typeof requireGuildAccess === "function"
+      ? requireGuildAccess({ from: "query", key: "guildId" })
+      : (req, res, next) => next();
+
+  function requireOverviewScope(req, res, next) {
+    const rawGuildId = req.query && req.query.guildId;
+    if (rawGuildId) return guardGuildQuery(req, res, next);
+    if (isGlobalBotOwner(req.dashboardUser)) return next();
+    return res.status(403).json({ ok: false, error: "NO_GUILD_SELECTED" });
+  }
+
+  // Global overview is owner-only; server overview requires the selected guild scope.
+  app.get(
+    "/api/overview",
+    requireDashboardAuth,
+    requireOverviewScope,
+    async (req, res) => {
+      try {
+        const client = typeof getClient === "function" ? getClient() : null;
+        const guildId = sanitizeId(req.query && req.query.guildId);
+        if (!client || !client.guilds || !client.guilds.cache) {
+          return res.json({
+            ok: true,
+            scope: guildId ? "guild" : "global",
+            guilds: 0,
+            users: 0,
+            actions24h: 0,
+          });
+        }
+
+        const guildsCache = client.guilds.cache;
+        const guilds = guildId
+          ? [guildsCache.get(String(guildId))].filter(Boolean)
+          : Array.from(guildsCache.values ? guildsCache.values() : guildsCache);
+        if (guildId && !guilds.length)
+          return res.status(404).json({ ok: false, error: "GUILD_NOT_FOUND" });
+        const guildsCount = Array.isArray(guilds)
+          ? guilds.length
+          : guildsCache.size || 0;
+
+        let usersCount = 0;
+        for (const g of guilds) {
+          if (g && typeof g.memberCount === "number")
+            usersCount += g.memberCount;
+        }
+
+        // Count moderation actions in the last 24h
+        let actions24h = 0;
+        try {
+          if (Infraction && typeof Infraction.countDocuments === "function") {
+            const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            actions24h = await Infraction.countDocuments({
+              ...(guildId ? { guildId } : {}),
+              createdAt: { $gte: since },
+            }).exec();
+          }
+        } catch (errCount) {
+          console.error(
+            "[Dashboard] Failed to count infractions for overview:",
+            errCount,
+          );
+          actions24h = 0;
+        }
+
+        return res.json({
+          ok: true,
+          scope: guildId ? "guild" : "global",
+          guilds: guildsCount,
+          users: usersCount,
+          actions24h,
+        });
+      } catch (err) {
+        console.error("[Dashboard] /api/overview error (safe fallback):", err);
         return res.json({ ok: true, guilds: 0, users: 0, actions24h: 0 });
       }
-
-      const guildsCache = client.guilds.cache;
-      const guilds = Array.from(
-        guildsCache.values ? guildsCache.values() : guildsCache,
-      );
-      const guildsCount = Array.isArray(guilds)
-        ? guilds.length
-        : guildsCache.size || 0;
-
-      let usersCount = 0;
-      for (const g of guilds) {
-        if (g && typeof g.memberCount === "number") usersCount += g.memberCount;
-      }
-
-      // Count moderation actions in the last 24h
-      let actions24h = 0;
-      try {
-        if (Infraction && typeof Infraction.countDocuments === "function") {
-          const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          actions24h = await Infraction.countDocuments({
-            createdAt: { $gte: since },
-          }).exec();
-        }
-      } catch (errCount) {
-        console.error(
-          "[Dashboard] Failed to count infractions for overview:",
-          errCount,
-        );
-        actions24h = 0;
-      }
-
-      return res.json({
-        ok: true,
-        guilds: guildsCount,
-        users: usersCount,
-        actions24h,
-      });
-    } catch (err) {
-      console.error("[Dashboard] /api/overview error (safe fallback):", err);
-      return res.json({ ok: true, guilds: 0, users: 0, actions24h: 0 });
-    }
-  });
+    },
+  );
 
   function requireBotOwner(req, res, next) {
-    if (!isBotOwner(req.dashboardUser)) {
+    if (!isGlobalBotOwner(req.dashboardUser)) {
       return res.status(403).json({ ok: false, error: "BOT_OWNER_REQUIRED" });
     }
     return next();
@@ -257,7 +288,7 @@ function registerCoreRoutes({
   app.get("/api/internal/metrics", metricsGuard, (req, res) => {
     try {
       const u = req.dashboardUser;
-      const isAdmin = isBotOperator(u);
+      const isAdmin = isGlobalBotOwner(u);
 
       if (!isAdmin && !hasValidMetricsToken(req)) {
         return res.status(403).json({ ok: false, error: "NO_PERMISSION" });

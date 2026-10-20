@@ -17,11 +17,12 @@ This repository ships with a built-in dashboard (Express + JWT auth). To run it 
    - The OAuth callback issues a session JWT stored in an HttpOnly cookie; there is no local password login.
    - `dashboard.requireAuth=false` is ignored in production; auth bypass is development-only.
 
-4. Guild access is scoped to the guilds returned by Discord OAuth:
-   - The token carries `allowedGuildIds`; requests to any other guild are rejected.
-   - Only the single configured bot owner can access every installed guild and global Premium/payment administration.
+4. Global and guild access are separate:
+   - The bot owner can access global bot configuration, metrics, and Premium/payment administration.
+   - The owner can manage a server only when Discord OAuth confirms they own it or have the Administrator permission there.
+   - The owner may see the bot's installed-server inventory, but installations outside their own/admin guilds are read-only and cannot be selected for management.
+   - Other users' tokens carry only the guilds where Discord OAuth confirms owner/Administrator access; requests to any other guild are rejected.
    - `BOT_OWNER_IDS` is limited to one ID (the first valid entry); if unset, the built-in primary owner is used.
-   - `BOT_ADMIN_IDS` grants delegated access only to guilds where that Discord account has Administrator permission; it does not grant global payment or license management.
 
 5. Rate limiting:
    - Baseline limiter is applied on `/api` plus stricter per-endpoint limiters on auth/mod actions.

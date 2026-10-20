@@ -221,6 +221,10 @@ const guildConfigSchema = new Schema(
         roleId: { type: String, default: null },
       },
     },
+    featuresConfigured: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
