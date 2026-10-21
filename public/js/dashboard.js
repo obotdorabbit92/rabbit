@@ -751,6 +751,7 @@
     if (sequence !== dashboardLanguageSequence) return;
     state.lang = selectedLanguage;
     applyI18n();
+    renderGlobalGuildInventory();
   }
 
   async function loadGuildDashboardLanguage(guildId) {
@@ -1322,6 +1323,14 @@
     const globalPremiumView = state.currentTab === "premium-admin";
     const globalOwnerView =
       state.me && state.me.role === "BOT_OWNER" && !hasGuild;
+    var globalInventory = document.getElementById("overviewGlobalInventory");
+    var globalShortcuts = document.getElementById("overviewGlobalShortcuts");
+    var serverShortcuts = document.getElementById("overviewServerShortcuts");
+    if (globalInventory)
+      globalInventory.classList.toggle("hidden", !globalOwnerView);
+    if (globalShortcuts)
+      globalShortcuts.classList.toggle("hidden", !globalOwnerView);
+    if (serverShortcuts) serverShortcuts.classList.toggle("hidden", !hasGuild);
     if (warn) {
       // Avoid flashing the warning during bootstrap (before guilds are loaded).
       warn.style.display =
@@ -1458,6 +1467,41 @@
     const actionsEl = document.getElementById("kpiActions24h");
     if (!guildsEl || !usersEl || !actionsEl) return;
 
+    const isGlobal =
+      !state.guildId && state.me && state.me.role === "BOT_OWNER";
+    const title = document.getElementById("overviewTitle");
+    const hint = document.getElementById("overviewHint");
+    const guildKpi = document.getElementById("overviewGuildKpi");
+    const kpis = document.getElementById("overviewKpis");
+    const guildLabel = guildKpi && guildKpi.querySelector(".kpi-label");
+    if (title) {
+      title.setAttribute(
+        "data-i18n",
+        isGlobal ? "overview_global_title" : "overview_server_title",
+      );
+      title.textContent = t(
+        isGlobal ? "overview_global_title" : "overview_server_title",
+      );
+    }
+    if (hint) {
+      hint.setAttribute(
+        "data-i18n",
+        isGlobal ? "overview_global_hint" : "overview_server_hint",
+      );
+      hint.textContent = t(
+        isGlobal ? "overview_global_hint" : "overview_server_hint",
+      );
+    }
+    if (guildLabel) {
+      guildLabel.setAttribute(
+        "data-i18n",
+        isGlobal ? "kpi_guilds" : "kpi_server_scope",
+      );
+      guildLabel.textContent = t(isGlobal ? "kpi_guilds" : "kpi_server_scope");
+    }
+    if (guildKpi) guildKpi.classList.toggle("hidden", !isGlobal);
+    if (kpis) kpis.classList.toggle("overview-kpis--server", !isGlobal);
+
     try {
       const overviewPath = state.guildId
         ? "/overview?guildId=" + encodeURIComponent(state.guildId)
@@ -1494,6 +1538,76 @@
     }
   }
 
+  function renderGlobalGuildInventory(query) {
+    var list = document.getElementById("overviewGuildInventoryList");
+    var empty = document.getElementById("overviewGuildInventoryEmpty");
+    var picker = document.getElementById("guildPicker");
+    var search = document.getElementById("overviewGuildSearch");
+    if (!list || !empty) return;
+    if (search && !search.dataset.bound) {
+      search.dataset.bound = "1";
+      search.addEventListener("input", function () {
+        renderGlobalGuildInventory(search.value);
+      });
+    }
+
+    var normalizedQuery = String(query || "")
+      .trim()
+      .toLocaleLowerCase();
+    var guilds = (state.guilds || []).filter(function (guild) {
+      return (
+        guild &&
+        (!normalizedQuery ||
+          String(guild.name || "")
+            .toLocaleLowerCase()
+            .includes(normalizedQuery))
+      );
+    });
+    list.innerHTML = "";
+    guilds.forEach(function (guild) {
+      var row = document.createElement("div");
+      row.className = "list-item overview-guild-row";
+      row.setAttribute("role", "listitem");
+
+      var identity = document.createElement("div");
+      identity.className = "overview-guild-row__identity";
+      var name = document.createElement("strong");
+      name.className = "title";
+      name.textContent = guild.name || guild.id;
+      var metadata = document.createElement("span");
+      metadata.className = "subtitle";
+      metadata.textContent =
+        typeof guild.memberCount === "number"
+          ? t("overview_inventory_members", {
+              count: guild.memberCount.toLocaleString(state.lang),
+            })
+          : guild.id;
+      identity.appendChild(name);
+      identity.appendChild(metadata);
+      row.appendChild(identity);
+
+      if (guild.manageable) {
+        var openButton = document.createElement("button");
+        openButton.type = "button";
+        openButton.className = "btn xs";
+        openButton.textContent = t("overview_open_server");
+        openButton.addEventListener("click", function () {
+          if (!picker) return;
+          picker.value = guild.id;
+          picker.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        row.appendChild(openButton);
+      } else {
+        var readOnly = document.createElement("span");
+        readOnly.className = "badge badge-readonly";
+        readOnly.textContent = t("guild_read_only");
+        row.appendChild(readOnly);
+      }
+      list.appendChild(row);
+    });
+    empty.classList.toggle("hidden", guilds.length > 0);
+  }
+
   // -----------------------------
   // Guilds + Users
   // -----------------------------
@@ -1525,6 +1639,7 @@
       }
       const items = (res && res.items) || [];
       state.guilds = items;
+      renderGlobalGuildInventory();
       select.innerHTML = "";
 
       var returnParams = new URLSearchParams(window.location.search);
@@ -3432,8 +3547,11 @@
     setupConfigSectionNavigation();
 
     // Atalhos do Overview: navegam para a aba correspondente.
-    var overviewShortcuts = document.getElementById("overviewShortcuts");
-    if (overviewShortcuts) {
+    [
+      document.getElementById("overviewShortcuts"),
+      document.getElementById("overviewGlobalShortcuts"),
+    ].forEach(function (overviewShortcuts) {
+      if (!overviewShortcuts) return;
       overviewShortcuts.addEventListener("click", function (ev) {
         var btn =
           ev.target && ev.target.closest
@@ -3443,7 +3561,7 @@
         var target = btn.getAttribute("data-goto");
         if (target) setTab(target);
       });
-    }
+    });
 
     // Guild picker
     var guildPicker = document.getElementById("guildPicker");

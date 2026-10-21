@@ -125,6 +125,7 @@ window.OzarkLocales.pt = {
   config_staff_roles_logs: "Staff para Logs",
   config_staff_roles_feature_hint:
     "Se uma lista por funcionalidade estiver vazia, será usada a lista geral acima.",
+  config_staff_roles_overrides: "Cargos específicos por área",
   config_rolepicker_add: "Adicionar",
   config_rolepicker_placeholder: "Escolher cargo…",
   config_rolepicker_empty: "Nenhum cargo selecionado.",
@@ -492,6 +493,25 @@ window.OzarkLocales.pt = {
   logs_top_online_panel_time: "online",
   logs_user_label: "Utilizador",
   overview_error_generic: "Não foi possível carregar a visão geral.",
+  overview_global_title: "Visão geral da plataforma",
+  overview_server_title: "Visão geral do servidor",
+  overview_global_hint:
+    "Estado do bot, servidores ligados e atividade recente da plataforma.",
+  overview_server_hint:
+    "Atividade e estado da moderação no servidor selecionado.",
+  overview_inventory_title: "Servidores ligados",
+  overview_inventory_hint:
+    "A instalação do bot não concede acesso de gestão ao servidor.",
+  overview_inventory_search_label: "Pesquisar servidores",
+  overview_inventory_search_placeholder: "Nome do servidor",
+  overview_inventory_empty: "Não foram encontrados servidores.",
+  overview_inventory_members: "{count} membros",
+  overview_open_server: "Gerir",
+  overview_global_actions_title: "Gestão global",
+  overview_global_actions_hint:
+    "Configuração da plataforma e administração Premium.",
+  overview_open_global_management: "Abrir gestão global",
+  kpi_server_scope: "Servidor selecionado",
   overview_hint:
     "Resumo rápido do estado do bot, servidores ligados e atividade recente.",
   overview_title: "Visão geral",
@@ -983,6 +1003,7 @@ window.OzarkLocales.pt = {
   features_preset_custom: "Personalizado",
   features_setup_incomplete:
     "Preenche os campos obrigatórios e escolhe um preset ou Personalizado antes de guardar.",
+  features_advanced_settings: "Opções avançadas",
   preset_autokick_soft: "Suave (5)",
   preset_autokick_strict: "Rigoroso (3)",
   preset_autokick_severe: "Severo (1)",

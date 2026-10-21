@@ -122,6 +122,7 @@ window.OzarkLocales.en = {
   config_staff_roles_logs: "Staff for Logs",
   config_staff_roles_feature_hint:
     "If a feature-specific list is empty, the general list above is used.",
+  config_staff_roles_overrides: "Per-feature role overrides",
   config_rolepicker_add: "Add",
   config_rolepicker_placeholder: "Select role…",
   config_rolepicker_empty: "No roles selected.",
@@ -479,6 +480,25 @@ window.OzarkLocales.en = {
   logs_top_online_panel_time: "online",
   logs_user_label: "User",
   overview_error_generic: "Failed to load overview.",
+  overview_global_title: "Platform overview",
+  overview_server_title: "Server overview",
+  overview_global_hint:
+    "Bot health, installed servers and recent platform activity.",
+  overview_server_hint:
+    "Activity and moderation status for the selected server.",
+  overview_inventory_title: "Installed servers",
+  overview_inventory_hint:
+    "Installation does not grant access to manage a server.",
+  overview_inventory_search_label: "Search servers",
+  overview_inventory_search_placeholder: "Server name",
+  overview_inventory_empty: "No servers match this search.",
+  overview_inventory_members: "{count} members",
+  overview_open_server: "Manage",
+  overview_global_actions_title: "Global management",
+  overview_global_actions_hint:
+    "Platform configuration and Premium administration.",
+  overview_open_global_management: "Open global management",
+  kpi_server_scope: "Selected server",
   overview_hint:
     "Quick summary of bot status, connected servers, and recent activity.",
   overview_title: "Overview",
@@ -962,6 +982,7 @@ window.OzarkLocales.en = {
   features_preset_custom: "Custom",
   features_setup_incomplete:
     "Complete the required fields and choose a preset or Custom before saving.",
+  features_advanced_settings: "Advanced options",
   preset_autokick_soft: "Soft (5)",
   preset_autokick_strict: "Strict (3)",
   preset_autokick_severe: "Severe (1)",

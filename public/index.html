@@ -584,13 +584,12 @@
           aria-labelledby="tabbtn-overview"
         >
           <div class="card">
-            <h2 data-i18n="overview_title">Visão geral</h2>
-            <p class="hint" data-i18n="overview_hint">
-              Resumo de alto nível sobre o estado do bot, servidores ligados e
-              atividade recente.
+            <h2 id="overviewTitle" data-i18n="overview_title">Visão geral</h2>
+            <p class="hint" id="overviewHint" data-i18n="overview_global_hint">
+              Estado da plataforma, servidores ligados e atividade recente.
             </p>
-            <div class="grid-3">
-              <div class="kpi kpi--guilds">
+            <div class="grid-3 overview-kpis" id="overviewKpis">
+              <div class="kpi kpi--guilds" id="overviewGuildKpi">
                 <div class="kpi__top">
                   <span class="kpi__icon" aria-hidden="true">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -676,13 +675,51 @@
             </div>
           </div>
 
-          <div class="card">
+          <div class="card hidden" id="overviewGlobalInventory">
+            <div class="section-head">
+              <div>
+                <h3 data-i18n="overview_inventory_title">Servidores ligados</h3>
+                <p class="hint" data-i18n="overview_inventory_hint">
+                  A instalação do bot não concede acesso de gestão.
+                </p>
+              </div>
+              <label class="feature-search" for="overviewGuildSearch">
+                <span data-i18n="overview_inventory_search_label"
+                  >Pesquisar servidores</span
+                >
+                <input
+                  class="input"
+                  id="overviewGuildSearch"
+                  type="search"
+                  data-i18n-placeholder="overview_inventory_search_placeholder"
+                  placeholder="Nome do servidor"
+                  autocomplete="off"
+                />
+              </label>
+            </div>
+            <div
+              class="list overview-guild-list"
+              id="overviewGuildInventoryList"
+              role="list"
+            ></div>
+            <p
+              class="empty hidden"
+              id="overviewGuildInventoryEmpty"
+              role="status"
+              aria-live="polite"
+              data-i18n="overview_inventory_empty"
+            >
+              Não foram encontrados servidores.
+            </p>
+          </div>
+
+          <div class="card" id="overviewServerShortcuts">
             <h3 data-i18n="overview_shortcuts_title">Atalhos</h3>
             <p class="hint" data-i18n="overview_shortcuts_hint">
               Vai diretamente para a área que queres gerir.
             </p>
             <div class="features-grid" id="overviewShortcuts">
-              <article class="feature-card">
+              <article class="feature-card overview-server-shortcut">
                 <div class="feature-card__head">
                   <h4 class="feature-card__name" data-i18n="tab_features">
                     Funcionalidades
@@ -704,7 +741,7 @@
                   </div>
                 </div>
               </article>
-              <article class="feature-card">
+              <article class="feature-card overview-server-shortcut">
                 <div class="feature-card__head">
                   <h4 class="feature-card__name" data-i18n="tab_logs">
                     Moderação
@@ -726,7 +763,7 @@
                   </div>
                 </div>
               </article>
-              <article class="feature-card">
+              <article class="feature-card overview-server-shortcut">
                 <div class="feature-card__head">
                   <h4 class="feature-card__name" data-i18n="tab_user">
                     Utilizadores
@@ -748,7 +785,7 @@
                   </div>
                 </div>
               </article>
-              <article class="feature-card">
+              <article class="feature-card overview-server-shortcut">
                 <div class="feature-card__head">
                   <h4 class="feature-card__name" data-i18n="tab_config">
                     Configuração
@@ -770,6 +807,25 @@
                   </div>
                 </div>
               </article>
+            </div>
+          </div>
+
+          <div class="card hidden" id="overviewGlobalShortcuts">
+            <h3 data-i18n="overview_global_actions_title">Gestão global</h3>
+            <p class="hint" data-i18n="overview_global_actions_hint">
+              Configurações da plataforma e administração Premium.
+            </p>
+            <div class="feature-card__actions">
+              <div class="feature-card__actions-left">
+                <button
+                  class="btn xs"
+                  type="button"
+                  data-goto="premium-admin"
+                  data-i18n="overview_open_global_management"
+                >
+                  Abrir Gestão Global
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -2865,40 +2921,51 @@
                     </p>
                   </div>
                 </div>
-                <div class="staff-role-feature-grid">
-                  <div class="field">
-                    <label
-                      for="staffRolesModeration"
-                      data-i18n="config_staff_roles_moderation"
-                      >Moderação</label
-                    >
-                    <select
-                      id="staffRolesModeration"
-                      class="select"
-                      multiple
-                      size="4"
-                    ></select>
-                    <p class="hint" data-i18n="config_staff_roles_feature_hint">
-                      Se vazio, usa a lista geral de cargos de staff.
-                    </p>
+                <details class="staff-role-overrides">
+                  <summary data-i18n="config_staff_roles_overrides">
+                    Cargos específicos por área
+                  </summary>
+                  <div class="staff-role-feature-grid">
+                    <div class="field">
+                      <label
+                        for="staffRolesModeration"
+                        data-i18n="config_staff_roles_moderation"
+                        >Moderação</label
+                      >
+                      <select
+                        id="staffRolesModeration"
+                        class="select"
+                        multiple
+                        size="4"
+                      ></select>
+                      <p
+                        class="hint"
+                        data-i18n="config_staff_roles_feature_hint"
+                      >
+                        Se vazio, usa a lista geral de cargos de staff.
+                      </p>
+                    </div>
+                    <div class="field">
+                      <label
+                        for="staffRolesTickets"
+                        data-i18n="config_staff_roles_tickets"
+                        >Tickets</label
+                      >
+                      <select
+                        id="staffRolesTickets"
+                        class="select"
+                        multiple
+                        size="4"
+                      ></select>
+                      <p
+                        class="hint"
+                        data-i18n="config_staff_roles_feature_hint"
+                      >
+                        Se vazio, usa a lista geral de cargos de staff.
+                      </p>
+                    </div>
                   </div>
-                  <div class="field">
-                    <label
-                      for="staffRolesTickets"
-                      data-i18n="config_staff_roles_tickets"
-                      >Tickets</label
-                    >
-                    <select
-                      id="staffRolesTickets"
-                      class="select"
-                      multiple
-                      size="4"
-                    ></select>
-                    <p class="hint" data-i18n="config_staff_roles_feature_hint">
-                      Se vazio, usa a lista geral de cargos de staff.
-                    </p>
-                  </div>
-                </div>
+                </details>
               </div>
 
               <div class="card subcard" id="config-section-advanced">

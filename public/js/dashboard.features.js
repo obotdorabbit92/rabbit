@@ -209,6 +209,9 @@
           min: 0,
           max: 10080,
         },
+        { type: "publish" },
+      ],
+      advancedFields: [
         {
           type: "text",
           name: "title",
@@ -230,7 +233,6 @@
           placeholderKey: "features_placeholder_verify_button",
           maxLength: 80,
         },
-        { type: "publish" },
       ],
       presets: [
         {
@@ -260,6 +262,9 @@
       premiumModule: "tickets",
       fields: [
         { type: "channel", name: "channelId", label: "features_channel" },
+        { type: "publish" },
+      ],
+      advancedFields: [
         {
           type: "text",
           name: "openEmoji",
@@ -309,7 +314,6 @@
           placeholderKey: "features_placeholder_ticket_close",
           maxLength: 300,
         },
-        { type: "publish" },
       ],
       presets: [
         {
@@ -331,6 +335,8 @@
           placeholderKey: "features_placeholder_welcome_message",
           maxLength: 500,
         },
+      ],
+      advancedFields: [
         { type: "bool", name: "embed", label: "features_embed" },
         {
           type: "text",
@@ -393,6 +399,8 @@
           placeholderKey: "features_placeholder_goodbye_message",
           maxLength: 500,
         },
+      ],
+      advancedFields: [
         { type: "bool", name: "embed", label: "features_embed" },
         {
           type: "text",
@@ -440,6 +448,14 @@
           name: "showMembers",
           label: "features_stats_show_members",
         },
+        { type: "bool", name: "showJoins", label: "features_stats_show_joins" },
+        {
+          type: "bool",
+          name: "showLeaves",
+          label: "features_stats_show_leaves",
+        },
+      ],
+      advancedFields: [
         {
           type: "text",
           name: "memberTemplate",
@@ -447,18 +463,12 @@
           placeholderKey: "features_placeholder_stats_member",
           maxLength: 100,
         },
-        { type: "bool", name: "showJoins", label: "features_stats_show_joins" },
         {
           type: "text",
           name: "joinsTemplate",
           label: "features_stats_joins",
           placeholderKey: "features_placeholder_stats_joins",
           maxLength: 100,
-        },
-        {
-          type: "bool",
-          name: "showLeaves",
-          label: "features_stats_show_leaves",
         },
         {
           type: "text",
@@ -1081,10 +1091,24 @@
         return fieldHtml(feature.key, f, v[f.name]);
       })
       .join("");
+    var advancedFields = (feature.advancedFields || [])
+      .map(function (f) {
+        return fieldHtml(feature.key, f, v[f.name]);
+      })
+      .join("");
+    var advancedFieldsHtml = advancedFields
+      ? '<details class="feature-advanced"><summary>' +
+        esc(t("features_advanced_settings")) +
+        '</summary><div class="feature-card__fields">' +
+        advancedFields +
+        "</div></details>"
+      : "";
 
-    var hasPublish = (feature.fields || []).some(function (f) {
-      return f.type === "publish";
-    });
+    var hasPublish = (feature.fields || [])
+      .concat(feature.advancedFields || [])
+      .some(function (f) {
+        return f.type === "publish";
+      });
     var publishLabel =
       current[feature.key] && current[feature.key].messageId
         ? t("features_republish")
@@ -1208,6 +1232,7 @@
       setupHintHtml +
       presetsHtml +
       (fields ? '<div class="feature-card__fields">' + fields + "</div>" : "") +
+      advancedFieldsHtml +
       previewHtml +
       '<div class="feature-card__actions">' +
       '<div class="feature-card__actions-left">' +
@@ -1501,13 +1526,13 @@
       });
     }
 
-    var fieldsWrap = card.querySelector(".feature-card__fields");
+    var fieldsWraps = card.querySelectorAll(".feature-card__fields");
     var refreshPreview = previewBox
       ? function () {
           renderEmbedPreview(card, feature, previewBox);
         }
       : null;
-    if (fieldsWrap) {
+    Array.prototype.forEach.call(fieldsWraps, function (fieldsWrap) {
       fieldsWrap.addEventListener("input", function () {
         markCardDraft(card);
         resetDiagnosis(card);
@@ -1518,7 +1543,7 @@
         resetDiagnosis(card);
         if (refreshPreview) refreshPreview();
       });
-    }
+    });
     if (refreshPreview) refreshPreview();
 
     card.addEventListener("click", function (ev) {
@@ -1569,43 +1594,45 @@
     var enabledEl = card.querySelector('[data-role="enabled"]');
     out.enabled = !!(enabledEl && enabledEl.checked);
 
-    (feature.fields || []).forEach(function (f) {
-      if (f.type === "publish") return;
+    (feature.fields || [])
+      .concat(feature.advancedFields || [])
+      .forEach(function (f) {
+        if (f.type === "publish") return;
 
-      if (f.type === "entries") {
-        out.entries = Array.prototype.slice
-          .call(card.querySelectorAll('[data-role="entry-row"]'))
-          .map(function (row) {
-            var emojiEl = row.querySelector('[data-entry="emoji"]');
-            var roleEl = row.querySelector('[data-entry="roleId"]');
-            return {
-              emoji: emojiEl ? String(emojiEl.value || "").trim() : "",
-              roleId: roleEl ? String(roleEl.value || "").trim() : "",
-            };
-          })
-          .filter(function (e) {
-            return e.emoji && e.roleId;
-          });
-        return;
-      }
+        if (f.type === "entries") {
+          out.entries = Array.prototype.slice
+            .call(card.querySelectorAll('[data-role="entry-row"]'))
+            .map(function (row) {
+              var emojiEl = row.querySelector('[data-entry="emoji"]');
+              var roleEl = row.querySelector('[data-entry="roleId"]');
+              return {
+                emoji: emojiEl ? String(emojiEl.value || "").trim() : "",
+                roleId: roleEl ? String(roleEl.value || "").trim() : "",
+              };
+            })
+            .filter(function (e) {
+              return e.emoji && e.roleId;
+            });
+          return;
+        }
 
-      var el = card.querySelector('[data-field="' + f.name + '"]');
-      if (!el) return;
+        var el = card.querySelector('[data-field="' + f.name + '"]');
+        if (!el) return;
 
-      if (f.type === "bool") {
-        out[f.name] = !!el.checked;
-      } else if (f.type === "number") {
-        var n = parseInt(el.value, 10);
-        out[f.name] = Number.isFinite(n)
-          ? n
-          : prev[f.name] != null
-            ? prev[f.name]
-            : null;
-      } else {
-        var v = String(el.value || "").trim();
-        out[f.name] = v ? v : null;
-      }
-    });
+        if (f.type === "bool") {
+          out[f.name] = !!el.checked;
+        } else if (f.type === "number") {
+          var n = parseInt(el.value, 10);
+          out[f.name] = Number.isFinite(n)
+            ? n
+            : prev[f.name] != null
+              ? prev[f.name]
+              : null;
+        } else {
+          var v = String(el.value || "").trim();
+          out[f.name] = v ? v : null;
+        }
+      });
 
     return out;
   }
@@ -1638,6 +1665,15 @@
           el.value = val == null ? "" : String(val);
         }
       });
+      var advancedDetails = card.querySelector(".feature-advanced");
+      if (
+        advancedDetails &&
+        Object.keys(preset.values || {}).some(function (name) {
+          return advancedDetails.querySelector('[data-field="' + name + '"]');
+        })
+      ) {
+        advancedDetails.open = true;
+      }
     }
 
     var previewBox = card.querySelector('[data-role="preview"]');

@@ -752,6 +752,7 @@ function registerAuthRoutes(ctx) {
           ? u.botGuildInventory
           : [],
         selectedGuildId: u.selectedGuildId || null,
+        guildScopeVersion: u.guildScopeVersion || null,
         profile: u.profile || null,
         oauth: true,
       },
